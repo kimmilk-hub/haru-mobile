@@ -308,6 +308,48 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
 .oneliner-inp:focus{border-bottom-color:var(--accent);}
 .oneliner-inp::placeholder{color:var(--gray2);}
 
+/* ── DRAG & DROP ── */
+/* ghost that follows finger */
+.drag-ghost{
+  position:fixed;z-index:999;pointer-events:none;
+  background:var(--accent);color:white;
+  border-radius:12px;padding:10px 16px;font-size:13px;font-weight:500;
+  box-shadow:0 8px 24px rgba(43,92,63,.4);
+  opacity:.92;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:none;transform:translate(-50%,-50%) rotate(2deg) scale(1.05);
+  transition:transform .1s;
+}
+.drag-ghost.active{display:block;}
+
+/* draggable task item */
+.tb-item.dragging{opacity:.4;transform:scale(.97);}
+
+/* drop zone highlight on hour rows */
+.hour-row.drop-hover .h-dot{background:var(--accent);border-color:var(--accent);}
+.hour-row.drop-hover .h-lbl{color:var(--accent);font-weight:700;}
+.hour-row.drop-hover .empty-slot,
+.hour-row.drop-hover .h-blocks{
+  background:var(--accent2);border-radius:10px;
+}
+.drop-indicator{
+  display:none;height:3px;background:var(--accent);border-radius:2px;
+  margin:2px 0;position:relative;
+}
+.drop-indicator::before{
+  content:'';position:absolute;left:-5px;top:-4px;
+  width:11px;height:11px;border-radius:50%;background:var(--accent);
+}
+.hour-row.drop-hover .drop-indicator{display:block;}
+
+/* long-press ripple on tb-item */
+.tb-item{position:relative;overflow:hidden;user-select:none;}
+.tb-item::after{
+  content:'길게 눌러 배치';position:absolute;bottom:4px;right:8px;
+  font-size:9px;color:var(--gray2);opacity:0;transition:opacity .2s;
+  font-family:'Noto Sans KR',sans-serif;pointer-events:none;
+}
+.tb-item:active::after{opacity:1;}
+
 /* ════════════════════════
    MODALS / SHEETS
 ════════════════════════ */
@@ -426,9 +468,9 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
           <span class="tth-title">할 일 목록</span>
           <span class="tth-count" id="tb-count">0개</span>
         </div>
-        <span class="tth-arrow" id="tth-arrow">▼</span>
+        <span class="tth-arrow open" id="tth-arrow">▼</span>
       </div>
-      <div class="task-bank-body" id="task-bank-body"></div>
+      <div class="task-bank-body open" id="task-bank-body"></div>
     </div>
 
     <!-- progress -->
@@ -613,6 +655,9 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
     <button class="qa-btn-main" onclick="addQuickBlock()">추가</button>
   </div>
 </div>
+
+<!-- Drag ghost -->
+<div class="drag-ghost" id="drag-ghost"></div>
 
 <script>
 // ══════════════════════════════════════════
@@ -809,9 +854,142 @@ function delDump(id){
 }
 
 // ══════════════════════════════════════════
-// TASK BANK
+// DRAG & DROP (touch)
 // ══════════════════════════════════════════
-let taskBankOpen=false;
+let dragState = null; // {taskId, taskText, quadNum, startX, startY, longPressTimer}
+
+function initDragOnItem(el, item, quadNum) {
+  el.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    dragState = {
+      taskId: item.id,
+      taskText: item.text,
+      quadNum,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      longPressTimer: null,
+      dragging: false
+    };
+    dragState.longPressTimer = setTimeout(() => {
+      startDrag(el, touch);
+    }, 480);
+  }, {passive: true});
+
+  el.addEventListener('touchmove', e => {
+    if (!dragState) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - dragState.startX);
+    const dy = Math.abs(touch.clientY - dragState.startY);
+    if (!dragState.dragging && (dx > 8 || dy > 8)) {
+      clearTimeout(dragState.longPressTimer);
+    }
+    if (dragState.dragging) {
+      e.preventDefault(); // works because passive:false below
+      moveDragGhost(touch.clientX, touch.clientY);
+      highlightDropZone(touch.clientY);
+    }
+  }, {passive: false}); // ← 핵심 수정: false로 변경
+
+  el.addEventListener('touchend', e => {
+    if (!dragState) return;
+    clearTimeout(dragState.longPressTimer);
+    if (dragState.dragging) {
+      const touch = e.changedTouches[0];
+      dropOnTimeline(touch.clientY);
+    }
+    endDrag(el);
+  });
+
+  el.addEventListener('touchcancel', () => {
+    if (!dragState) return;
+    clearTimeout(dragState.longPressTimer);
+    endDrag(el);
+  });
+}
+
+function startDrag(el, touch) {
+  if (!dragState) return;
+  dragState.dragging = true;
+  el.classList.add('dragging');
+  if (navigator.vibrate) navigator.vibrate(40);
+
+  // 할 일 목록 자동으로 열기
+  if (!taskBankOpen) {
+    taskBankOpen = true;
+    document.getElementById('task-bank-body').classList.add('open');
+    document.getElementById('tth-arrow').classList.add('open');
+  }
+
+  const ghost = document.getElementById('drag-ghost');
+  ghost.textContent = '📌 ' + dragState.taskText;
+  ghost.classList.add('active');
+  moveDragGhost(touch.clientX, touch.clientY);
+}
+
+function moveDragGhost(x, y) {
+  const ghost = document.getElementById('drag-ghost');
+  ghost.style.left = x + 'px';
+  ghost.style.top = (y - 40) + 'px';
+}
+
+function highlightDropZone(clientY) {
+  // clear all
+  document.querySelectorAll('.hour-row').forEach(r => r.classList.remove('drop-hover'));
+  const rows = document.querySelectorAll('.hour-row');
+  rows.forEach(row => {
+    const rect = row.getBoundingClientRect();
+    if (clientY >= rect.top && clientY <= rect.bottom) {
+      row.classList.add('drop-hover');
+    }
+  });
+}
+
+function dropOnTimeline(clientY) {
+  if (!dragState || !dragState.taskId) return;
+  const rows = document.querySelectorAll('.hour-row');
+  let targetHour = -1;
+  rows.forEach((row, h) => {
+    const rect = row.getBoundingClientRect();
+    if (clientY >= rect.top && clientY <= rect.bottom) targetHour = h;
+  });
+  if (targetHour < 0 || targetHour > 22) return;
+
+  const day = getDay();
+  const allTasks = [...day.quads[1],...day.quads[2],...day.quads[3],...day.quads[4]];
+  const task = allTasks.find(t => t.id === dragState.taskId);
+  if (!task) return;
+
+  const start = `${String(targetHour).padStart(2,'0')}:00`;
+  const end = `${String(targetHour + 1).padStart(2,'0')}:00`;
+  const colorIdx = [2,1,0,6][dragState.quadNum - 1] || 0;
+
+  day.blocks.push({
+    id: uid(), taskId: dragState.taskId, title: task.text,
+    start, end, note: '', color: colorIdx, done: false, checklist: []
+  });
+  day.blocks.sort((a,b) => toMin(a.start) - toMin(b.start));
+  renderTimeline();
+  renderTaskBank();
+  updateStats();
+  scheduleSave();
+
+  // scroll to dropped block
+  setTimeout(() => {
+    if (rows[targetHour]) rows[targetHour].scrollIntoView({behavior:'smooth', block:'center'});
+  }, 100);
+}
+
+function endDrag(el) {
+  if (el) el.classList.remove('dragging');
+  document.getElementById('drag-ghost').classList.remove('active');
+  document.querySelectorAll('.hour-row').forEach(r => r.classList.remove('drop-hover'));
+  dragState = null;
+}
+
+// ══════════════════════════════════════════
+// TASK BANK (with drag init)
+// ══════════════════════════════════════════
+let taskBankOpen=true; // 기본값 열림으로 변경
 function toggleTaskBank(){
   taskBankOpen=!taskBankOpen;
   document.getElementById('task-bank-body').classList.toggle('open',taskBankOpen);
@@ -833,6 +1011,7 @@ function renderTaskBank(){
       const div=document.createElement('div');
       div.className=`tb-item ${Q_CLS[q]}`+(used?' used':'');
       div.innerHTML=`<div class="tb-item-title">${item.text}</div><button class="tb-item-add" onclick="openTASheet('${item.id}','${item.text.replace(/'/g,"\\'")}')">+</button>`;
+      if (!used) initDragOnItem(div, item, q);
       body.appendChild(div);
     });
   });
