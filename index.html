@@ -656,6 +656,34 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
   </div>
 </div>
 
+<!-- Block edit sheet -->
+<div class="sheet-bg" id="block-edit-sheet">
+  <div class="sheet" style="padding:20px 16px calc(24px + var(--safe-bottom));">
+    <div class="sheet-handle"></div>
+    <div style="font-family:'Nanum Myeongjo',serif;font-size:17px;color:var(--ink);margin-bottom:4px;" id="be-title"></div>
+    <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--gray);margin-bottom:16px;" id="be-meta"></div>
+
+    <!-- 시간 수정 -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:10px;color:var(--gray);font-weight:600;display:block;margin-bottom:6px;">시간 수정</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px;">시작</label><input class="ta-inp" id="be-start" type="time"></div>
+        <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px;">종료</label><input class="ta-inp" id="be-end" type="time"></div>
+      </div>
+    </div>
+
+    <!-- 메모 수정 -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:10px;color:var(--gray);font-weight:600;display:block;margin-bottom:6px;">메모</label>
+      <textarea class="ta-note" id="be-note" placeholder="메모..."></textarea>
+    </div>
+
+    <!-- 버튼들 -->
+    <button class="ta-btn" id="be-save-btn" style="margin-bottom:8px;">저장</button>
+    <button id="be-del-btn" style="width:100%;background:none;border:1.5px solid #e0b0a0;border-radius:12px;padding:13px;color:var(--warn);font-size:14px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">삭제</button>
+  </div>
+</div>
+
 <!-- Drag ghost -->
 <div class="drag-ghost" id="drag-ghost"></div>
 
@@ -887,12 +915,14 @@ function initDragOnItem(el, item, quadNum) {
       e.preventDefault(); // works because passive:false below
       moveDragGhost(touch.clientX, touch.clientY);
       highlightDropZone(touch.clientY);
+      handleAutoScroll(touch.clientY); // 자동 스크롤
     }
   }, {passive: false}); // ← 핵심 수정: false로 변경
 
   el.addEventListener('touchend', e => {
     if (!dragState) return;
     clearTimeout(dragState.longPressTimer);
+    stopAutoScroll();
     if (dragState.dragging) {
       const touch = e.changedTouches[0];
       dropOnTimeline(touch.clientY);
@@ -903,6 +933,7 @@ function initDragOnItem(el, item, quadNum) {
   el.addEventListener('touchcancel', () => {
     if (!dragState) return;
     clearTimeout(dragState.longPressTimer);
+    stopAutoScroll();
     endDrag(el);
   });
 }
@@ -980,6 +1011,7 @@ function dropOnTimeline(clientY) {
 }
 
 function endDrag(el) {
+  stopAutoScroll();
   if (el) el.classList.remove('dragging');
   document.getElementById('drag-ghost').classList.remove('active');
   document.querySelectorAll('.hour-row').forEach(r => r.classList.remove('drop-hover'));
@@ -1121,6 +1153,7 @@ function renderTimeline(){
           <div class="b-actions">
             <button class="b-act" onclick="toggleDone('${b.id}',event)">${b.done?'↩ 취소':'✓ 완료'}</button>
             <button class="b-act" onclick="openCLSheet('${b.id}',event)">☰ 체크리스트</button>
+            <button class="b-act" onclick="openBlockEdit('${b.id}',event)">✎ 수정</button>
           </div>`;
         bwrap.appendChild(el);
       });
@@ -1130,7 +1163,68 @@ function renderTimeline(){
   }
 }
 
-function toggleDone(id,e){
+// ══════════════════════════════════════════
+// BLOCK EDIT / DELETE
+// ══════════════════════════════════════════
+let editBlockId = null;
+function openBlockEdit(id, e) {
+  e.stopPropagation();
+  editBlockId = id;
+  const b = getDay().blocks.find(x => x.id === id); if (!b) return;
+  document.getElementById('be-title').textContent = b.title;
+  document.getElementById('be-meta').textContent = `${b.start} – ${b.end}`;
+  document.getElementById('be-start').value = b.start;
+  document.getElementById('be-end').value = b.end;
+  document.getElementById('be-note').value = b.note || '';
+  document.getElementById('block-edit-sheet').classList.add('show');
+}
+document.getElementById('block-edit-sheet').addEventListener('click', e => {
+  if (e.target === document.getElementById('block-edit-sheet')) closeSheet('block-edit-sheet');
+});
+document.getElementById('be-save-btn').onclick = () => {
+  const b = getDay().blocks.find(x => x.id === editBlockId); if (!b) return;
+  const start = document.getElementById('be-start').value;
+  const end = document.getElementById('be-end').value;
+  if (toMin(end) <= toMin(start)) { alert('종료 시간이 시작 시간보다 늦어야 합니다.'); return; }
+  b.start = start; b.end = end;
+  b.note = document.getElementById('be-note').value.trim();
+  getDay().blocks.sort((a, b) => toMin(a.start) - toMin(b.start));
+  closeSheet('block-edit-sheet');
+  renderTimeline(); updateStats(); scheduleSave();
+};
+document.getElementById('be-del-btn').onclick = () => {
+  if (!confirm('블록을 삭제할까요?')) return;
+  const day = getDay();
+  day.blocks = day.blocks.filter(x => x.id !== editBlockId);
+  closeSheet('block-edit-sheet');
+  renderTimeline(); renderTaskBank(); updateStats(); scheduleSave();
+};
+
+// ══════════════════════════════════════════
+// DRAG AUTO-SCROLL
+// ══════════════════════════════════════════
+let autoScrollTimer = null;
+function handleAutoScroll(clientY) {
+  const view = document.getElementById('view2');
+  const rect = view.getBoundingClientRect();
+  const scrollZone = 80; // px from edge
+  const speed = 8;
+
+  clearInterval(autoScrollTimer);
+
+  if (clientY < rect.top + scrollZone) {
+    // 위로 스크롤
+    autoScrollTimer = setInterval(() => { view.scrollTop -= speed; }, 16);
+  } else if (clientY > rect.bottom - scrollZone) {
+    // 아래로 스크롤
+    autoScrollTimer = setInterval(() => { view.scrollTop += speed; }, 16);
+  }
+}
+
+function stopAutoScroll() {
+  clearInterval(autoScrollTimer);
+  autoScrollTimer = null;
+}
   e.stopPropagation();
   const b=getDay().blocks.find(x=>x.id===id);
   if(b){b.done=!b.done;renderTimeline();updateStats();scheduleSave();}
