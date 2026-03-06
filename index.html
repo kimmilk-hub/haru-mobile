@@ -1225,6 +1225,8 @@ function stopAutoScroll() {
   clearInterval(autoScrollTimer);
   autoScrollTimer = null;
 }
+
+function toggleDone(id,e){
   e.stopPropagation();
   const b=getDay().blocks.find(x=>x.id===id);
   if(b){b.done=!b.done;renderTimeline();updateStats();scheduleSave();}
