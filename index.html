@@ -203,12 +203,19 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
   transition:transform .1s;
 }
 .block:active{transform:scale(.99);}
-.block.done{opacity:.35;}
-.block.done .b-title{text-decoration:line-through;}
+.block.done{opacity:1;}
+.block.done .b-title{text-decoration:line-through;color:var(--gray);}
+.block.done .b-time{color:var(--gray2);}
+.block.done::after{content:'✓';position:absolute;top:8px;right:10px;font-size:13px;color:var(--accent);font-weight:700;}
 .b-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--gray);margin-bottom:3px;}
 .b-title{font-size:14px;color:var(--ink);line-height:1.4;font-weight:500;}
 .b-note{font-size:12px;color:var(--gray);line-height:1.5;margin-top:5px;font-style:italic;display:none;}
 .block.open .b-note{display:block;}
+.b-memo-wrap{display:none;margin-top:8px;}
+.block.open .b-memo-wrap{display:block;}
+.b-memo-inp{width:100%;border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'Noto Sans KR',sans-serif;color:var(--ink2);background:var(--bg);resize:none;min-height:52px;line-height:1.5;box-sizing:border-box;}
+.b-memo-inp:focus{outline:none;border-color:var(--accent);background:white;}
+.b-memo-inp::placeholder{color:var(--gray2);}
 .b-cl-bar-wrap{height:3px;background:rgba(0,0,0,.08);border-radius:2px;margin-top:7px;overflow:hidden;}
 .b-cl-bar{height:100%;border-radius:2px;transition:width .3s;}
 .b-cl-count{font-size:10px;color:var(--gray);margin-top:3px;font-family:'DM Mono',monospace;}
@@ -1148,8 +1155,10 @@ function renderTimeline(){
         el.innerHTML+=`
           <div class="b-meta">${b.start}–${b.end} · ${fmtMin(dur)}</div>
           <div class="b-title">${b.title}</div>
-          ${b.note?`<div class="b-note">${b.note}</div>`:''}
           ${clPart}
+          <div class="b-memo-wrap">
+            <textarea class="b-memo-inp" placeholder="✏️ 메모..." data-bid="${b.id}">${b.note||''}</textarea>
+          </div>
           <div class="b-actions">
             <button class="b-act" onclick="toggleDone('${b.id}',event)">${b.done?'↩ 취소':'✓ 완료'}</button>
             <button class="b-act" onclick="openCLSheet('${b.id}',event)">☰ 체크리스트</button>
@@ -1161,6 +1170,18 @@ function renderTimeline(){
     row.appendChild(lbl);row.appendChild(axis);row.appendChild(bwrap);
     tl.appendChild(row);
   }
+
+  // 메모 인라인 자동저장
+  tl.querySelectorAll('.b-memo-inp').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      e.stopPropagation();
+      const bid=inp.dataset.bid;
+      const b=getDay().blocks.find(x=>x.id===bid);
+      if(b){b.note=inp.value;scheduleSave();}
+    });
+    inp.addEventListener('click',e=>e.stopPropagation());
+    inp.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+  });
 }
 
 // ══════════════════════════════════════════
