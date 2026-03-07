@@ -671,18 +671,12 @@ body{font-family:'Noto Sans KR',sans-serif;font-size:14px;color:var(--ink);displ
     <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--gray);margin-bottom:16px;" id="be-meta"></div>
 
     <!-- 시간 수정 -->
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:20px;">
       <label style="font-size:10px;color:var(--gray);font-weight:600;display:block;margin-bottom:6px;">시간 수정</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px;">시작</label><input class="ta-inp" id="be-start" type="time"></div>
         <div><label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px;">종료</label><input class="ta-inp" id="be-end" type="time"></div>
       </div>
-    </div>
-
-    <!-- 메모 수정 -->
-    <div style="margin-bottom:14px;">
-      <label style="font-size:10px;color:var(--gray);font-weight:600;display:block;margin-bottom:6px;">메모</label>
-      <textarea class="ta-note" id="be-note" placeholder="메모..."></textarea>
     </div>
 
     <!-- 버튼들 -->
@@ -1196,7 +1190,6 @@ function openBlockEdit(id, e) {
   document.getElementById('be-meta').textContent = `${b.start} – ${b.end}`;
   document.getElementById('be-start').value = b.start;
   document.getElementById('be-end').value = b.end;
-  document.getElementById('be-note').value = b.note || '';
   document.getElementById('block-edit-sheet').classList.add('show');
 }
 document.getElementById('block-edit-sheet').addEventListener('click', e => {
@@ -1208,7 +1201,6 @@ document.getElementById('be-save-btn').onclick = () => {
   const end = document.getElementById('be-end').value;
   if (toMin(end) <= toMin(start)) { alert('종료 시간이 시작 시간보다 늦어야 합니다.'); return; }
   b.start = start; b.end = end;
-  b.note = document.getElementById('be-note').value.trim();
   getDay().blocks.sort((a, b) => toMin(a.start) - toMin(b.start));
   closeSheet('block-edit-sheet');
   renderTimeline(); updateStats(); scheduleSave();
