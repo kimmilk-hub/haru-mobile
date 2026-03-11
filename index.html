@@ -355,7 +355,52 @@ textarea.inp{resize:none;line-height:1.6;}
 .oneliner-inp{width:100%;background:none;border:none;border-bottom:1.5px solid var(--line2);padding:8px 0;font-size:13px;color:var(--ink);font-family:'Noto Sans KR',sans-serif;outline:none;}
 .oneliner-inp:focus{border-bottom-color:var(--accent);}
 
-/* ── 드래그 → 타임라인 ── */
+/* ── TOP5 드래그 재정렬 ── */
+.top5-slot{transition:transform .15s,opacity .15s;}
+.top5-slot.drag-over-slot{
+  border-color:var(--accent)!important;
+  background:var(--accent2)!important;
+  transform:scale(1.02);
+}
+.top5-slot.drag-over-slot.empty-slot{
+  border-style:dashed;
+}
+/* 덤프 → TOP5 드롭 힌트 */
+#top5-list.dump-dragging .top5-slot:not(.filled){
+  border-color:var(--accent);border-style:dashed;
+  animation:pulse-slot .8s ease infinite;
+}
+@keyframes pulse-slot{0%,100%{background:var(--paper2)}50%{background:var(--accent2)}}
+
+/* ── 월간 프로젝트 바 ── */
+.month-proj-row{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  padding:0 10px;gap:2px;
+  margin-bottom:1px;
+}
+.proj-bar-cell{height:14px;position:relative;}
+.proj-bar{
+  position:absolute;inset:1px 0;
+  border-radius:4px;font-size:9px;color:white;
+  display:flex;align-items:center;overflow:hidden;
+  cursor:pointer;padding:0 4px;white-space:nowrap;
+  font-family:'Noto Sans KR',sans-serif;font-weight:500;
+}
+.proj-bar.start{border-radius:6px 2px 2px 6px;}
+.proj-bar.end{border-radius:2px 6px 6px 2px;}
+.proj-bar.start.end{border-radius:6px;}
+.proj-bar.middle{border-radius:1px;}
+/* 월간 프로젝트 추가 버튼 */
+.month-proj-add{
+  margin:4px 12px 0;width:calc(100% - 24px);
+  background:none;border:1px dashed var(--line2);border-radius:8px;
+  padding:7px;color:var(--gray);font-size:12px;cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;
+}
+/* 프로젝트 시트 날짜범위 */
+.proj-date-row{display:flex;gap:8px;align-items:center;}
+.proj-date-row span{color:var(--gray);font-size:13px;flex-shrink:0;}
+</style>
 .top5-slot.filled{cursor:grab;}
 .top5-slot.dragging-task,.remain-item.dragging-task{opacity:.35;transform:scale(.98);}
 .remain-item{cursor:grab;}
@@ -432,7 +477,9 @@ textarea.inp{resize:none;line-height:1.6;}
     <div class="month-dow">수</div><div class="month-dow">목</div><div class="month-dow">금</div>
     <div class="month-dow">토</div>
   </div>
+  <div id="month-proj-area"></div>
   <div class="month-grid" id="month-grid"></div>
+  <button class="month-proj-add" onclick="openProjSheet()">＋ 프로젝트 추가</button>
   <div class="day-panel" id="day-panel"></div>
 </div>
 
@@ -681,6 +728,35 @@ textarea.inp{resize:none;line-height:1.6;}
   </div>
 </div>
 
+<!-- 프로젝트 추가/수정 -->
+<div class="sheet-bg" id="proj-sheet">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="proj-sheet-title">프로젝트 추가</div>
+    <div class="field-wrap">
+      <label class="field-label">프로젝트 이름</label>
+      <input class="inp" id="proj-name" placeholder="예: 기말고사 준비, 독서 마라톤…">
+    </div>
+    <div class="field-wrap">
+      <label class="field-label">기간</label>
+      <div class="proj-date-row">
+        <input class="inp" id="proj-start" type="date" style="flex:1;">
+        <span>–</span>
+        <input class="inp" id="proj-end" type="date" style="flex:1;">
+      </div>
+    </div>
+    <div class="field-wrap">
+      <label class="field-label">색상</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="proj-colors"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeSheet('proj-sheet')">취소</button>
+      <button class="btn-primary" onclick="saveProject()">저장</button>
+    </div>
+    <button class="btn-danger" id="proj-del-btn" style="display:none;" onclick="deleteProject()">프로젝트 삭제</button>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════
 // SUPABASE
@@ -722,6 +798,7 @@ let curDate=todayD();
 
 // 데이터
 let events=[];       // [{id,date:dk,text,color}]  연간 이벤트
+let projects=[];     // [{id,name,start:dk,end:dk,color}]  월간 프로젝트
 let weekly={};       // {weekKey: [{id,text,quad,done}]}
 let daily={};        // {dk: {top5:[{id,text,fromWeekId,done}], blocks:[...], review:{...}}}
 let saveTimer=null;
@@ -756,7 +833,7 @@ function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveAll,900
 async function saveAll(){
   setSyncStatus('syncing');
   try{
-    await sb.from('diary_days').upsert({date:'__haru_v2__',data:{events,weekly,daily}},{onConflict:'date'});
+    await sb.from('diary_days').upsert({date:'__haru_v2__',data:{events,projects,weekly,daily}},{onConflict:'date'});
     setSyncStatus('ok');
   }catch(e){setSyncStatus('err');}
 }
@@ -767,6 +844,7 @@ async function loadAll(){
     if(error&&error.code!=='PGRST116')throw error;
     if(data?.data){
       events=data.data.events||[];
+      projects=data.data.projects||[];
       weekly=data.data.weekly||{};
       daily=data.data.daily||{};
     }
@@ -945,14 +1023,61 @@ function renderMonth(){
   const prevLast=new Date(curYear,curMonth,0).getDate();
   const eventDates=new Set(events.map(e=>e.date));
 
+  // ── 프로젝트 바 렌더링 ──
+  // 이번 달에 걸치는 프로젝트 필터
+  const monthStart=dk(new Date(curYear,curMonth,1));
+  const monthEnd=dk(new Date(curYear,curMonth+1,0));
+  const visProjects=projects.filter(p=>p.start<=monthEnd&&p.end>=monthStart);
+
+  // 달력 날짜 배열 (이전달 포함)
+  const calCells=[];
+  for(let i=startDow-1;i>=0;i--) calCells.push({d:prevLast-i,month:curMonth-1,other:true});
+  for(let d=1;d<=lastDay;d++) calCells.push({d,month:curMonth,other:false,key:dk(new Date(curYear,curMonth,d))});
+  const rem=(7-((startDow+lastDay)%7))%7;
+  for(let d=1;d<=rem;d++) calCells.push({d,month:curMonth+1,other:true});
+
+  // 프로젝트를 행(row)으로 배치 (겹치지 않게)
+  const projRows=[];
+  visProjects.forEach(p=>{
+    let row=projRows.findIndex(r=>r.every(x=>x.end<p.start||x.start>p.end));
+    if(row===-1){projRows.push([]);row=projRows.length-1;}
+    projRows[row].push(p);
+  });
+
+  // 주(7칸)별 프로젝트 바 HTML
+  const weeks=[];
+  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7));
+
+  let projAreaHtml='';
+  if(projRows.length){
+    projRows.forEach(row=>{
+      weeks.forEach(week=>{
+        let rowHtml='<div class="month-proj-row">';
+        week.forEach(cell=>{
+          if(cell.other){rowHtml+=`<div class="proj-bar-cell"></div>`;return;}
+          const proj=row.find(p=>p.start<=cell.key&&p.end>=cell.key);
+          if(proj){
+            const isStart=proj.start===cell.key;
+            const isEnd=proj.end===cell.key;
+            const cls=`proj-bar${isStart?' start':''}${isEnd?' end':''}${!isStart&&!isEnd?' middle':''}`;
+            rowHtml+=`<div class="proj-bar-cell"><div class="${cls}" style="background:${proj.color||'#2b5c3f'}" onclick="openProjSheet('${proj.id}')">${isStart?proj.name:''}</div></div>`;
+          }else{
+            rowHtml+=`<div class="proj-bar-cell"></div>`;
+          }
+        });
+        rowHtml+='</div>';
+        projAreaHtml+=rowHtml;
+      });
+    });
+  }
+  document.getElementById('month-proj-area').innerHTML=projAreaHtml;
+
+  // ── 날짜 그리드 ──
   const grid=document.getElementById('month-grid');
   let html='';
-
-  // 이전달
   for(let i=startDow-1;i>=0;i--){
     html+=`<div class="mc other"><div class="mc-n">${prevLast-i}</div></div>`;
   }
-  // 이번달
   for(let d=1;d<=lastDay;d++){
     const dd=new Date(curYear,curMonth,d);
     const key=dk(dd);
@@ -963,6 +1088,7 @@ function renderMonth(){
     const blocks=dayData?.blocks||[];
     const colors=[...new Set(blocks.map(b=>b.color||'#2b5c3f'))].slice(0,3);
     const hasEv=eventDates.has(key);
+    const hasProj=visProjects.some(p=>p.start<=key&&p.end>=key);
     const numCls='mc-n'+(dow===0?' sun':dow===6?' sat':'');
     html+=`<div class="mc${isToday?' today':''}${isSel?' selected':''}" id="mc-${key}" onclick="selectDay('${key}')">
       <div class="${numCls}">${d}</div>
@@ -972,13 +1098,72 @@ function renderMonth(){
       </div>
     </div>`;
   }
-  // 다음달
-  const remain=(7-((startDow+lastDay)%7))%7;
-  for(let d=1;d<=remain;d++)html+=`<div class="mc other"><div class="mc-n">${d}</div></div>`;
-
+  const remain2=(7-((startDow+lastDay)%7))%7;
+  for(let d=1;d<=remain2;d++)html+=`<div class="mc other"><div class="mc-n">${d}</div></div>`;
   grid.innerHTML=html;
   if(selectedDayKey)showDayPanel(selectedDayKey);
   else document.getElementById('day-panel').classList.remove('show');
+}
+
+// ══════════════════════════════════════════
+// 프로젝트 CRUD
+// ══════════════════════════════════════════
+let projColor=COLORS[0];
+let editProjId=null;
+
+function openProjSheet(id=null){
+  editProjId=id;
+  projColor=COLORS[1];
+  if(id){
+    const p=projects.find(x=>x.id===id);if(!p)return;
+    document.getElementById('proj-name').value=p.name;
+    document.getElementById('proj-start').value=p.start;
+    document.getElementById('proj-end').value=p.end;
+    projColor=p.color||COLORS[1];
+    document.getElementById('proj-del-btn').style.display='block';
+    document.getElementById('proj-sheet-title').textContent='프로젝트 수정';
+  }else{
+    document.getElementById('proj-name').value='';
+    // 기본: 이번 달 1일~말일
+    document.getElementById('proj-start').value=dk(new Date(curYear,curMonth,1));
+    document.getElementById('proj-end').value=dk(new Date(curYear,curMonth+1,0));
+    document.getElementById('proj-del-btn').style.display='none';
+    document.getElementById('proj-sheet-title').textContent='프로젝트 추가';
+  }
+  renderColorPicker('proj-colors',projColor,c=>projColor=c);
+  document.getElementById('proj-sheet').classList.add('show');
+  setTimeout(()=>document.getElementById('proj-name').focus(),200);
+}
+function saveProject(){
+  const name=document.getElementById('proj-name').value.trim();
+  const start=document.getElementById('proj-start').value;
+  const end=document.getElementById('proj-end').value;
+  if(!name||!start||!end)return;
+  if(editProjId){
+    const p=projects.find(x=>x.id===editProjId);
+    if(p){p.name=name;p.start=start;p.end=end;p.color=projColor;}
+  }else{
+    projects.push({id:uid(),name,start,end,color:projColor});
+  }
+  closeSheet('proj-sheet');renderMonth();scheduleSave();
+}
+function deleteProject(){
+  projects=projects.filter(p=>p.id!==editProjId);
+  closeSheet('proj-sheet');renderMonth();scheduleSave();
+}
+// proj-colors 피커 연결
+function renderColorPicker(containerId,selected,onChange){
+  const el=document.getElementById(containerId);
+  el.innerHTML=COLORS.map(c=>`<div onclick="pickColorFor('${containerId}',this)" data-c="${c}" style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;border:2.5px solid ${c===selected?'var(--ink)':'transparent'};transition:border-color .1s;"></div>`).join('');
+  el._onChange=onChange;
+}
+function pickColorFor(containerId,el){
+  const c=el.dataset.c;
+  document.querySelectorAll(`#${containerId} div`).forEach(s=>s.style.borderColor=s.dataset.c===c?'var(--ink)':'transparent');
+  if(containerId==='bl-colors')blColor=c;
+  else if(containerId==='proj-colors')projColor=c;
+  const wrap=document.getElementById(containerId);
+  if(wrap._onChange)wrap._onChange(c);
 }
 
 function selectDay(key){
@@ -1281,12 +1466,31 @@ function renderDayDump(){
   pool.innerHTML=dumps.length
     ? dumps.map(chip=>{
         const used=usedIds.has(chip.id);
-        return`<div class="dump-chip${used?' assigned':''}">
+        return`<div class="dump-chip${used?' assigned':''}"
+          draggable="true"
+          data-id="${chip.id}"
+          data-text="${chip.text.replace(/"/g,'&quot;')}"
+          data-source="daydump">
           ${chip.text}
           <button class="dump-chip-del" onclick="removeDayDump('${chip.id}')">×</button>
         </div>`;
       }).join('')
     : `<div style="font-size:11px;color:var(--gray2);padding:4px 0;">오늘 새로 생긴 할 일을 입력하세요</div>`;
+
+  // 덤프 칩 → TOP5 드래그
+  document.querySelectorAll('#day-dump-pool .dump-chip[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      dumpDragId=el.dataset.id;
+      dumpDragText=el.dataset.text;
+      e.dataTransfer.effectAllowed='copy';
+      document.getElementById('top5-list').classList.add('dump-dragging');
+    });
+    el.addEventListener('dragend',()=>{
+      dumpDragId=null;dumpDragText=null;
+      document.getElementById('top5-list').classList.remove('dump-dragging');
+    });
+    el.addEventListener('touchstart',dumpTouchStart,{passive:true});
+  });
 }
 
 function removeDayDump(id){
@@ -1295,7 +1499,62 @@ function removeDayDump(id){
   renderDayDump();scheduleSave();
 }
 
+// 덤프→TOP5 드래그 상태
+let dumpDragId=null, dumpDragText=null;
+let dumpTouchClone=null, dumpTouchSrc=null, dumpTouchTargetSlot=null;
 
+function dumpTouchStart(e){
+  const el=e.currentTarget;
+  dumpDragId=el.dataset.id; dumpDragText=el.dataset.text;
+  dumpTouchSrc=el;
+  const t=e.touches[0];
+  dumpTouchClone=document.createElement('div');
+  dumpTouchClone.id='tl-touch-clone';
+  dumpTouchClone.textContent=dumpDragText;
+  dumpTouchClone.style.left=(t.clientX-60)+'px';
+  dumpTouchClone.style.top=(t.clientY-18)+'px';
+  document.body.appendChild(dumpTouchClone);
+  el.classList.add('dragging');
+  document.getElementById('top5-list').classList.add('dump-dragging');
+  document.addEventListener('touchmove',dumpTouchMove,{passive:false});
+  document.addEventListener('touchend',dumpTouchEnd,{once:true});
+}
+function dumpTouchMove(e){
+  if(!dumpTouchClone)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  dumpTouchClone.style.left=(t.clientX-60)+'px';
+  dumpTouchClone.style.top=(t.clientY-18)+'px';
+  dumpTouchClone.style.display='none';
+  const under=document.elementFromPoint(t.clientX,t.clientY);
+  dumpTouchClone.style.display='';
+  const slot=under?.closest('.top5-slot');
+  document.querySelectorAll('.top5-slot').forEach(s=>s.classList.remove('drag-over-slot'));
+  if(slot){slot.classList.add('drag-over-slot');dumpTouchTargetSlot=parseInt(slot.dataset.slot??'-1');}
+  else dumpTouchTargetSlot=null;
+}
+function dumpTouchEnd(){
+  document.removeEventListener('touchmove',dumpTouchMove);
+  if(dumpTouchClone){dumpTouchClone.remove();dumpTouchClone=null;}
+  if(dumpTouchSrc)dumpTouchSrc.classList.remove('dragging');
+  document.querySelectorAll('.top5-slot').forEach(s=>s.classList.remove('drag-over-slot'));
+  document.getElementById('top5-list').classList.remove('dump-dragging');
+  if(dumpTouchTargetSlot!==null&&dumpDragText){
+    dropDumpToTop5Slot(dumpTouchTargetSlot,dumpDragId,dumpDragText);
+  }
+  dumpDragId=null;dumpDragText=null;dumpTouchSrc=null;dumpTouchTargetSlot=null;
+}
+function dropDumpToTop5Slot(slot,id,text){
+  const day=getDay();
+  while(day.top5.length<=slot)day.top5.push(null);
+  day.top5[slot]={id:uid(),text,fromWeekId:null,fromDayDumpId:id,done:false};
+  renderTop5();renderDayDump();scheduleSave();
+}
+
+// ══════════════════════════════════════════
+// TOP 5 — 드래그 재정렬 + 덤프 드롭
+// ══════════════════════════════════════════
+let top5DragIdx=null; // 재정렬용
 
 function renderDay(){
   renderDayDump();
@@ -1305,7 +1564,6 @@ function renderDay(){
   renderDailyStats();
 }
 
-// TOP 5
 function renderTop5(){
   const day=getDay();
   const el=document.getElementById('top5-list');
@@ -1316,33 +1574,136 @@ function renderTop5(){
     if(task){
       return`<div class="top5-slot filled${task.done?' done-slot':''}"
         draggable="true"
+        data-idx="${i}"
+        data-slot="${i}"
         data-text="${task.text.replace(/"/g,'&quot;')}"
         data-color="${color}"
-        data-idx="${i}">
-        <div class="top5-rank" style="color:${color}">${rank}</div>
+        ondragover="top5SlotDragOver(event,${i})"
+        ondragleave="top5SlotDragLeave(event)"
+        ondrop="top5SlotDrop(event,${i})">
+        <div class="top5-rank" style="color:${color};cursor:grab">⠿</div>
         <div class="top5-task-text" onclick="toggleTop5(${i})">${task.text}</div>
-        <div class="top5-check${task.done?' done':''}" style="${task.done?`background:${color};border-color:${color}`:`border-color:${color}`}" onclick="toggleTop5(${i})">✓</div>
+        <div class="top5-check${task.done?' done':''}" style="${task.done?`background:${color};border-color:${color}`:`border-color:${color}`}" onclick="event.stopPropagation();toggleTop5(${i})">✓</div>
         <button class="top5-remove" onclick="removeTop5(${i})">×</button>
       </div>`;
     }else{
-      return`<div class="top5-slot" onclick="openTop5Sheet(${i})">
-        <div class="top5-rank" style="color:${color};opacity:.3">${rank}</div>
-        <div class="top5-empty-text">탭해서 할 일 선택…</div>
+      return`<div class="top5-slot empty-slot"
+        data-slot="${i}"
+        ondragover="top5SlotDragOver(event,${i})"
+        ondragleave="top5SlotDragLeave(event)"
+        ondrop="top5SlotDrop(event,${i})"
+        onclick="openTop5Sheet(${i})">
+        <div class="top5-rank" style="color:${color};opacity:.25">${rank}</div>
+        <div class="top5-empty-text">탭하거나 드래그해서 추가…</div>
       </div>`;
     }
   }).join('');
-  // 드래그 이벤트 붙이기
+
+  // TOP5 재정렬 드래그
   document.querySelectorAll('.top5-slot.filled[draggable]').forEach(el=>{
     el.addEventListener('dragstart',e=>{
+      top5DragIdx=parseInt(el.dataset.idx);
+      // 타임라인 드래그도 겸용
       tlDragText=el.dataset.text;
       tlDragColor=el.dataset.color||COLORS[0];
       el.classList.add('dragging-task');
-      e.dataTransfer.effectAllowed='copy';
+      e.dataTransfer.effectAllowed='move';
     });
-    el.addEventListener('dragend',()=>el.classList.remove('dragging-task'));
-    el.addEventListener('touchstart',tlTouchStart,{passive:true});
+    el.addEventListener('dragend',()=>{
+      el.classList.remove('dragging-task');
+      top5DragIdx=null;
+    });
+    el.addEventListener('touchstart',top5TouchStart,{passive:true});
   });
 }
+
+// TOP5 슬롯 드롭 이벤트 (재정렬 + 덤프 받기)
+function top5SlotDragOver(e,targetIdx){
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over-slot');
+}
+function top5SlotDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-slot');
+}
+function top5SlotDrop(e,targetIdx){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over-slot');
+  // 덤프 칩에서 온 경우
+  if(dumpDragId!==null){
+    dropDumpToTop5Slot(targetIdx,dumpDragId,dumpDragText);
+    dumpDragId=null;dumpDragText=null;
+    return;
+  }
+  // TOP5 내 재정렬
+  if(top5DragIdx!==null&&top5DragIdx!==targetIdx){
+    const day=getDay();
+    while(day.top5.length<5)day.top5.push(null);
+    const moved=day.top5.splice(top5DragIdx,1)[0];
+    day.top5.splice(targetIdx,0,moved);
+    top5DragIdx=null;
+    renderTop5();renderDayDump();scheduleSave();
+  }
+}
+
+// TOP5 터치 재정렬
+let top5TouchClone=null,top5TouchSrc=null,top5TouchSrcIdx=null,top5TouchTargetIdx=null;
+function top5TouchStart(e){
+  const el=e.currentTarget;
+  // 삭제/체크 버튼 터치는 무시
+  if(e.target.classList.contains('top5-remove')||e.target.classList.contains('top5-check'))return;
+  top5TouchSrcIdx=parseInt(el.dataset.idx);
+  top5TouchSrc=el;
+  tlDragText=el.dataset.text; tlDragColor=el.dataset.color||COLORS[0];
+  const t=e.touches[0];
+  top5TouchClone=document.createElement('div');
+  top5TouchClone.id='tl-touch-clone';
+  top5TouchClone.textContent=el.querySelector('.top5-task-text').textContent;
+  top5TouchClone.style.left=(t.clientX-80)+'px';
+  top5TouchClone.style.top=(t.clientY-18)+'px';
+  document.body.appendChild(top5TouchClone);
+  el.classList.add('dragging-task');
+  document.addEventListener('touchmove',top5TouchMove,{passive:false});
+  document.addEventListener('touchend',top5TouchEnd,{once:true});
+}
+function top5TouchMove(e){
+  if(!top5TouchClone)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  top5TouchClone.style.left=(t.clientX-80)+'px';
+  top5TouchClone.style.top=(t.clientY-18)+'px';
+  top5TouchClone.style.display='none';
+  const under=document.elementFromPoint(t.clientX,t.clientY);
+  top5TouchClone.style.display='';
+  // TOP5 슬롯?
+  const slot=under?.closest('.top5-slot');
+  // 타임라인?
+  const hl=under?.closest('.hour-line');
+  document.querySelectorAll('.top5-slot').forEach(s=>s.classList.remove('drag-over-slot'));
+  document.querySelectorAll('.hour-line').forEach(l=>l.classList.remove('tl-over'));
+  if(slot){slot.classList.add('drag-over-slot');top5TouchTargetIdx=parseInt(slot.dataset.slot??'-1');tlTouchTargetH=null;}
+  else if(hl){hl.classList.add('tl-over');tlTouchTargetH=parseInt(hl.dataset.hour);top5TouchTargetIdx=null;}
+  else{top5TouchTargetIdx=null;tlTouchTargetH=null;}
+}
+function top5TouchEnd(){
+  document.removeEventListener('touchmove',top5TouchMove);
+  if(top5TouchClone){top5TouchClone.remove();top5TouchClone=null;}
+  if(top5TouchSrc)top5TouchSrc.classList.remove('dragging-task');
+  document.querySelectorAll('.top5-slot').forEach(s=>s.classList.remove('drag-over-slot'));
+  document.querySelectorAll('.hour-line').forEach(l=>l.classList.remove('tl-over'));
+  if(top5TouchTargetIdx!==null&&top5TouchSrcIdx!==null&&top5TouchSrcIdx!==top5TouchTargetIdx){
+    const day=getDay();
+    while(day.top5.length<5)day.top5.push(null);
+    const moved=day.top5.splice(top5TouchSrcIdx,1)[0];
+    day.top5.splice(top5TouchTargetIdx,0,moved);
+    renderTop5();renderDayDump();scheduleSave();
+  }else if(tlTouchTargetH!==null&&tlDragText){
+    tlCreateBlock(tlDragText,tlDragColor,tlTouchTargetH);
+  }
+  top5TouchSrcIdx=null;top5TouchTargetIdx=null;top5TouchSrc=null;
+  tlDragText=null;tlDragColor=null;tlTouchTargetH=null;
+}
+
+
 
 function toggleTop5(idx){
   const day=getDay();
@@ -1816,18 +2177,7 @@ function showToast(msg){
   t._timer=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(10px)';},2200);
 }
 
-// 색상 피커
-function renderColorPicker(containerId,selected,onChange){
-  const el=document.getElementById(containerId);
-  el.innerHTML=COLORS.map(c=>`<div onclick="pickColor(this,'${containerId}')" data-c="${c}" style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;border:2.5px solid ${c===selected?'var(--ink)':'transparent'};transition:border-color .1s;"></div>`).join('');
-  el._onChange=onChange;
-}
-function pickColor(el,containerId){
-  const c=el.dataset.c;
-  document.querySelectorAll(`#${containerId} div`).forEach(s=>s.style.borderColor=s.dataset.c===c?'var(--ink)':'transparent');
-  const wrap=document.getElementById(containerId);
-  if(containerId==='bl-colors')blColor=c;
-}
+// (색상 피커는 위 renderColorPicker / pickColorFor 참조)
 
 // ══════════════════════════════════════════
 // 회고
