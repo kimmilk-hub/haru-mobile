@@ -198,7 +198,7 @@ textarea.inp{resize:none;line-height:1.6;}
 .day-panel-empty{font-size:11px;color:var(--gray);font-style:italic;}
 
 /* ════════════════════════════
-   탭3: 주간 (아이젠하워)
+   탭3: 주간 (브레인덤프 + 드래그)
 ════════════════════════════ */
 .week-nav{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);}
 .week-nav-label{flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink);font-weight:500;}
@@ -210,32 +210,56 @@ textarea.inp{resize:none;line-height:1.6;}
 .wp-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s;}
 .wp-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--gray);flex-shrink:0;width:30px;text-align:right;}
 
-/* 아이젠하워 4분면 */
-.ei-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;}
-.ei-quad{background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:10px;}
-.ei-quad-title{font-size:10px;font-weight:700;letter-spacing:.3px;margin-bottom:8px;display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;}
+/* 브레인덤프 영역 */
+.wk-dump-area{padding:12px 16px;border-bottom:1px solid var(--line);}
+.wk-dump-label{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--gray);font-family:'DM Mono',monospace;margin-bottom:8px;text-transform:uppercase;}
+.wk-dump-inp-row{display:flex;gap:8px;margin-bottom:8px;}
+.wk-dump-inp{flex:1;}
+.wk-dump-add{background:var(--accent);border:none;border-radius:10px;padding:10px 16px;color:white;font-size:18px;cursor:pointer;line-height:1;}
+.wk-dump-pool{display:flex;flex-wrap:wrap;gap:6px;min-height:32px;}
+.dump-chip{
+  display:flex;align-items:center;gap:5px;
+  background:var(--paper2);border:1.5px solid var(--line2);border-radius:20px;
+  padding:6px 10px;font-size:12px;color:var(--ink);
+  cursor:grab;user-select:none;
+  transition:all .15s;touch-action:none;
+}
+.dump-chip:active{cursor:grabbing;box-shadow:0 4px 12px rgba(0,0,0,.12);transform:scale(1.03);}
+.dump-chip.dragging{opacity:.4;}
+.dump-chip-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;}
+.dump-chip.assigned{border-style:dashed;opacity:.55;}
+
+/* 아이젠하워 4분면 드롭존 */
+.ei-section{padding:10px 12px 16px;}
+.ei-section-label{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--gray);font-family:'DM Mono',monospace;margin-bottom:8px;text-transform:uppercase;}
+.ei-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ei-quad{
+  border:1.5px solid var(--line);border-radius:12px;padding:10px;
+  min-height:80px;transition:all .2s;
+}
+.ei-quad.drag-over{border-color:var(--accent);background:var(--accent2);transform:scale(1.02);}
+.ei-quad-header{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
 .ei-quad-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ei-quad-title{font-size:10px;font-weight:700;color:var(--ink2);font-family:'DM Mono',monospace;line-height:1.3;}
 .ei-task{
   display:flex;align-items:flex-start;gap:6px;
-  padding:6px 8px;border-radius:7px;margin-bottom:4px;
-  cursor:pointer;transition:background .1s;
+  padding:5px 7px;border-radius:7px;margin-bottom:4px;
+  background:white;border:1px solid var(--line);
+  cursor:grab;touch-action:none;
 }
-.ei-task:active{filter:brightness(.97);}
-.ei-cb{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--line2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent;transition:all .13s;}
+.ei-task:active{cursor:grabbing;}
+.ei-task.dragging{opacity:.4;}
+.ei-cb{
+  width:14px;height:14px;border-radius:3px;border:1.5px solid var(--line2);
+  flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:transparent;transition:all .13s;cursor:pointer;
+}
 .ei-cb.done{color:white;}
-.ei-task-text{font-size:12px;color:var(--ink);line-height:1.4;flex:1;}
+.ei-task-text{font-size:11px;color:var(--ink);line-height:1.4;flex:1;}
 .ei-task-text.done{text-decoration:line-through;color:var(--gray);}
-.ei-task-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0;}
-.ei-add{
-  width:100%;background:none;border:none;
-  color:var(--gray2);font-size:11px;cursor:pointer;
-  padding:5px 8px;text-align:left;font-family:'Noto Sans KR',sans-serif;
-}
+.ei-task-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:12px;padding:0 1px;flex-shrink:0;}
+.ei-quad-empty{font-size:10px;color:var(--gray2);text-align:center;padding:8px 0;font-style:italic;}
 
-/* 주간 할 일 추가 시트 내 사분면 선택 */
-.quad-pick{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;}
-.quad-btn{border:1.5px solid var(--line2);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;text-align:center;background:var(--paper2);transition:all .13s;font-family:'Noto Sans KR',sans-serif;}
-.quad-btn.on{color:white;}
 
 /* ════════════════════════════
    탭4: 일간
@@ -381,7 +405,22 @@ textarea.inp{resize:none;line-height:1.6;}
     <div class="wp-bar"><div class="wp-fill" id="week-progress-fill" style="width:0%"></div></div>
     <div class="wp-pct" id="week-progress-pct">0%</div>
   </div>
-  <div class="ei-grid" id="ei-grid"></div>
+
+  <!-- 브레인덤프 -->
+  <div class="wk-dump-area">
+    <div class="wk-dump-label">이번 주 할 일 쏟아내기</div>
+    <div class="wk-dump-inp-row">
+      <input class="inp wk-dump-inp" id="wk-inp" placeholder="할 일을 입력하고 Enter…">
+      <button class="wk-dump-add" onclick="addDumpChip()">+</button>
+    </div>
+    <div class="wk-dump-pool" id="wk-dump-pool"></div>
+  </div>
+
+  <!-- 아이젠하워 4분면 -->
+  <div class="ei-section">
+    <div class="ei-section-label">드래그해서 분류</div>
+    <div class="ei-grid" id="ei-grid"></div>
+  </div>
 </div>
 
 <!-- ▌탭4: 일간 -->
@@ -506,31 +545,6 @@ textarea.inp{resize:none;line-height:1.6;}
       <button class="btn-primary" onclick="saveEvent()">저장</button>
     </div>
     <button class="btn-danger" id="ev-del-btn" style="display:none;" onclick="deleteEvent()">삭제</button>
-  </div>
-</div>
-
-<!-- 주간 할 일 추가 -->
-<div class="sheet-bg" id="weekly-sheet">
-  <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title">주간 할 일 추가</div>
-    <div class="field-wrap">
-      <label class="field-label">할 일</label>
-      <input class="inp" id="wt-text" placeholder="이번 주 해야 할 일…">
-    </div>
-    <div class="field-wrap">
-      <label class="field-label">사분면 (아이젠하워)</label>
-      <div class="quad-pick">
-        <button class="quad-btn on" data-q="q1" onclick="pickQuad(this)" style="border-color:var(--q1);color:var(--q1);">🔴 중요 + 긴급</button>
-        <button class="quad-btn"    data-q="q2" onclick="pickQuad(this)">🟢 중요 + 여유</button>
-        <button class="quad-btn"    data-q="q3" onclick="pickQuad(this)">🟡 긴급 + 비중요</button>
-        <button class="quad-btn"    data-q="q4" onclick="pickQuad(this)">⚪ 나중에</button>
-      </div>
-    </div>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="closeSheet('weekly-sheet')">취소</button>
-      <button class="btn-primary" onclick="saveWeeklyTask()">추가</button>
-    </div>
   </div>
 </div>
 
@@ -927,81 +941,239 @@ function goToDay(key){
 }
 
 // ══════════════════════════════════════════
-// 주간 뷰 (아이젠하워)
+// 주간 뷰 — 브레인덤프 + 드래그
 // ══════════════════════════════════════════
-let weeklySheetQuad='q1';
+// weekly[weekKey] = {
+//   dump: [{id, text}],           ← 미분류 풀
+//   quad: {q1:[{id,text,done}], q2:[], q3:[], q4:[]}
+// }
+
+function getWeekData(monday=curWeekMonday){
+  const k=weekKey(monday);
+  if(!weekly[k])weekly[k]={dump:[],quad:{q1:[],q2:[],q3:[],q4:[]}};
+  if(!weekly[k].dump)weekly[k].dump=[];
+  if(!weekly[k].quad)weekly[k].quad={q1:[],q2:[],q3:[],q4:[]};
+  ['q1','q2','q3','q4'].forEach(q=>{if(!weekly[k].quad[q])weekly[k].quad[q]=[];});
+  return weekly[k];
+}
+
+// 이전 형식 호환 (배열이면 마이그레이션)
+function migrateWeek(monday=curWeekMonday){
+  const k=weekKey(monday);
+  if(Array.isArray(weekly[k])){
+    const old=weekly[k];
+    weekly[k]={dump:[],quad:{q1:[],q2:[],q3:[],q4:[]}};
+    old.forEach(t=>{ weekly[k].quad[t.quad||'q4'].push({id:t.id,text:t.text,done:t.done||false}); });
+  }
+}
+
+function addDumpChip(){
+  const inp=document.getElementById('wk-inp');
+  const text=inp.value.trim();if(!text)return;
+  migrateWeek();
+  const wd=getWeekData();
+  wd.dump.push({id:uid(),text});
+  inp.value='';
+  renderWeek();scheduleSave();
+}
+document.getElementById('wk-inp').addEventListener('keydown',e=>{if(e.key==='Enter')addDumpChip();});
 
 function renderWeek(){
-  const tasks=getWeek(curWeekMonday);
-  const total=tasks.length;
-  const done=tasks.filter(t=>t.done).length;
+  migrateWeek();
+  const wd=getWeekData();
+  const allQuadTasks=[...wd.quad.q1,...wd.quad.q2,...wd.quad.q3,...wd.quad.q4];
+  const total=allQuadTasks.length;
+  const done=allQuadTasks.filter(t=>t.done).length;
   const pct=total?Math.round(done/total*100):0;
   document.getElementById('week-progress-fill').style.width=pct+'%';
   document.getElementById('week-progress-pct').textContent=pct+'%';
 
+  // 덤프 풀 렌더
+  const assignedIds=new Set(allQuadTasks.map(t=>t.id));
+  const pool=document.getElementById('wk-dump-pool');
+  pool.innerHTML=wd.dump.length
+    ? wd.dump.map(chip=>{
+        const assigned=assignedIds.has(chip.id);
+        return`<div class="dump-chip${assigned?' assigned':''}"
+          draggable="true"
+          data-id="${chip.id}"
+          data-text="${chip.text.replace(/"/g,'&quot;')}"
+          id="chip-${chip.id}">
+          ${chip.text}
+          <button class="dump-chip-del" onclick="removeChip('${chip.id}')">×</button>
+        </div>`;
+      }).join('')
+    : `<div style="font-size:11px;color:var(--gray2);padding:4px 0;">할 일을 입력하고 Enter를 누르세요</div>`;
+
+  // 4분면 렌더
   const grid=document.getElementById('ei-grid');
-  grid.innerHTML=['q1','q2','q3','q4'].map(q=>{
-    const qm=QUAD_META[q];
-    const qtasks=tasks.filter(t=>t.quad===q);
-    return`<div class="ei-quad">
-      <div class="ei-quad-title">
+  grid.innerHTML=Object.entries(QUAD_META).map(([q,qm])=>{
+    const tasks=wd.quad[q]||[];
+    return`<div class="ei-quad" id="quad-${q}"
+      data-quad="${q}"
+      ondragover="quadDragOver(event)"
+      ondragleave="quadDragLeave(event)"
+      ondrop="quadDrop(event,'${q}')"
+      ontouchmove="touchMove(event)"
+      ontouchend="touchEnd(event,'${q}')">
+      <div class="ei-quad-header">
         <div class="ei-quad-dot" style="background:${qm.dot}"></div>
-        ${qm.label}
+        <div class="ei-quad-title">${qm.label}</div>
       </div>
-      ${qtasks.map(t=>`<div class="ei-task" style="background:${t.done?qm.bg:''}">
-        <div class="ei-cb${t.done?' done':''}" style="${t.done?`background:${qm.cb};border-color:${qm.cb}`:`border-color:${qm.dot}`}" onclick="toggleWeekTask('${t.id}')">✓</div>
-        <div class="ei-task-text${t.done?' done':''}">${t.text}</div>
-        <button class="ei-task-del" onclick="deleteWeekTask('${t.id}')">×</button>
-      </div>`).join('')}
-      <button class="ei-add" onclick="openWeeklySheet('${q}')">＋ 추가</button>
+      ${tasks.length
+        ? tasks.map(t=>`<div class="ei-task"
+            draggable="true"
+            data-id="${t.id}"
+            data-text="${t.text.replace(/"/g,'&quot;')}"
+            data-from="${q}"
+            id="qtask-${t.id}">
+            <div class="ei-cb${t.done?' done':''}" style="${t.done?`background:${qm.dot};border-color:${qm.dot}`:`border-color:${qm.dot}`}" onclick="toggleQuadTask('${q}','${t.id}')">✓</div>
+            <div class="ei-task-text${t.done?' done':''}">${t.text}</div>
+            <button class="ei-task-del" onclick="removeQuadTask('${q}','${t.id}')">×</button>
+          </div>`).join('')
+        : `<div class="ei-quad-empty">드래그해서 놓기</div>`}
     </div>`;
   }).join('');
+
+  // 드래그 이벤트 칩에 붙이기
+  setupDragEvents();
 }
 
-function openWeeklySheet(quad='q1'){
-  weeklySheetQuad=quad;
-  document.getElementById('wt-text').value='';
-  document.querySelectorAll('.quad-btn').forEach(b=>{
-    const on=b.dataset.q===quad;
-    b.classList.toggle('on',on);
-    const qm=QUAD_META[b.dataset.q];
-    b.style.borderColor=on?qm.dot:'var(--line2)';
-    b.style.color=on?qm.dot:'var(--ink2)';
-    b.style.background=on?qm.bg:'var(--paper2)';
+// ── 드래그 & 드롭 (마우스/터치 통합) ──
+let dragId=null, dragText=null, dragFrom=null; // dragFrom: 'dump' or quadKey
+let touchChip=null, touchClone=null;
+
+function setupDragEvents(){
+  // 덤프 칩
+  document.querySelectorAll('.dump-chip[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      dragId=el.dataset.id; dragText=el.dataset.text; dragFrom='dump';
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+    // 터치
+    el.addEventListener('touchstart',touchStart,{passive:true});
   });
-  document.getElementById('weekly-sheet').classList.add('show');
-  setTimeout(()=>document.getElementById('wt-text').focus(),200);
-}
-function pickQuad(btn){
-  weeklySheetQuad=btn.dataset.q;
-  document.querySelectorAll('.quad-btn').forEach(b=>{
-    const on=b===btn;
-    const qm=QUAD_META[b.dataset.q];
-    b.classList.toggle('on',on);
-    b.style.borderColor=on?qm.dot:'var(--line2)';
-    b.style.color=on?qm.dot:'var(--ink2)';
-    b.style.background=on?qm.bg:'var(--paper2)';
+  // 사분면 내 태스크
+  document.querySelectorAll('.ei-task[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      dragId=el.dataset.id; dragText=el.dataset.text; dragFrom=el.dataset.from;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+    el.addEventListener('touchstart',touchStart,{passive:true});
   });
 }
-function saveWeeklyTask(){
-  const text=document.getElementById('wt-text').value.trim();
-  if(!text)return;
-  getWeek(curWeekMonday).push({id:uid(),text,quad:weeklySheetQuad,done:false});
-  closeSheet('weekly-sheet');
+
+function quadDragOver(e){
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function quadDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function quadDrop(e,q){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!dragId)return;
+  dropToQuad(q);
+}
+function dropToQuad(targetQ){
+  migrateWeek();
+  const wd=getWeekData();
+  // 이미 같은 분면이면 스킵
+  if(dragFrom===targetQ)return;
+  // 원래 분면에서 제거
+  if(dragFrom&&dragFrom!=='dump'){
+    wd.quad[dragFrom]=(wd.quad[dragFrom]||[]).filter(t=>t.id!==dragId);
+  }
+  // 이미 다른 분면에 있으면 거기서도 제거
+  ['q1','q2','q3','q4'].forEach(q=>{
+    if(q!==targetQ) wd.quad[q]=(wd.quad[q]||[]).filter(t=>t.id!==dragId);
+  });
+  // 대상 분면에 없으면 추가
+  if(!wd.quad[targetQ].find(t=>t.id===dragId)){
+    wd.quad[targetQ].push({id:dragId,text:dragText,done:false});
+  }
+  dragId=null;dragText=null;dragFrom=null;
   renderWeek();scheduleSave();
 }
-function toggleWeekTask(id){
-  const tasks=getWeek(curWeekMonday);
-  const t=tasks.find(x=>x.id===id);
+
+// ── 터치 드래그 ──
+let touchStartX=0,touchStartY=0,touchTargetQ=null;
+function touchStart(e){
+  const el=e.currentTarget;
+  dragId=el.dataset.id; dragText=el.dataset.text;
+  dragFrom=el.dataset.from||'dump';
+  touchChip=el;
+  const t=e.touches[0];
+  touchStartX=t.clientX; touchStartY=t.clientY;
+  // 클론 생성
+  touchClone=el.cloneNode(true);
+  touchClone.style.cssText=`position:fixed;z-index:9999;pointer-events:none;opacity:.85;transform:scale(1.05);font-size:12px;padding:6px 10px;background:white;border:1.5px solid var(--accent);border-radius:20px;`;
+  touchClone.style.left=(t.clientX-40)+'px';
+  touchClone.style.top=(t.clientY-20)+'px';
+  document.body.appendChild(touchClone);
+  el.classList.add('dragging');
+}
+function touchMove(e){
+  if(!touchClone)return;
+  const t=e.touches[0];
+  touchClone.style.left=(t.clientX-40)+'px';
+  touchClone.style.top=(t.clientY-20)+'px';
+  // 어떤 분면 위에 있는지
+  touchClone.style.display='none';
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  touchClone.style.display='';
+  const quad=el?.closest('.ei-quad');
+  document.querySelectorAll('.ei-quad').forEach(q=>q.classList.remove('drag-over'));
+  if(quad){quad.classList.add('drag-over');touchTargetQ=quad.dataset.quad;}
+  else touchTargetQ=null;
+}
+function touchEnd(e,q){
+  if(touchClone){touchClone.remove();touchClone=null;}
+  if(touchChip)touchChip.classList.remove('dragging');
+  document.querySelectorAll('.ei-quad').forEach(q=>q.classList.remove('drag-over'));
+  if(touchTargetQ){dropToQuad(touchTargetQ);}
+  touchTargetQ=null;touchChip=null;
+}
+
+function removeChip(id){
+  migrateWeek();
+  const wd=getWeekData();
+  wd.dump=wd.dump.filter(c=>c.id!==id);
+  ['q1','q2','q3','q4'].forEach(q=>{ wd.quad[q]=(wd.quad[q]||[]).filter(t=>t.id!==id); });
+  renderWeek();scheduleSave();
+}
+function toggleQuadTask(q,id){
+  const wd=getWeekData();
+  const t=(wd.quad[q]||[]).find(x=>x.id===id);
   if(t){t.done=!t.done;}
   renderWeek();scheduleSave();
 }
-function deleteWeekTask(id){
-  const k=weekKey(curWeekMonday);
-  weekly[k]=(weekly[k]||[]).filter(t=>t.id!==id);
+function removeQuadTask(q,id){
+  const wd=getWeekData();
+  wd.quad[q]=(wd.quad[q]||[]).filter(t=>t.id!==id);
   renderWeek();scheduleSave();
 }
-document.getElementById('wt-text').addEventListener('keydown',e=>{if(e.key==='Enter')saveWeeklyTask();});
+
+// getWeek 호환 (일간에서 주간 할 일 읽을 때)
+function getWeekTasks(monday=curWeekMonday){
+  migrateWeek(monday);
+  const wd=getWeekData(monday);
+  return [...(wd.quad.q1||[]),...(wd.quad.q2||[]),...(wd.quad.q3||[]),...(wd.quad.q4||[])];
+}
+function getWeekTaskQuad(id,monday=curWeekMonday){
+  const wd=getWeekData(monday);
+  for(const q of['q1','q2','q3','q4']){
+    if((wd.quad[q]||[]).find(t=>t.id===id))return q;
+  }
+  return'q4';
+}
+
+
 
 // ══════════════════════════════════════════
 // 일간 뷰
@@ -1054,7 +1226,7 @@ function removeTop5(idx){
 function openTop5Sheet(slot){
   top5SheetSlot=slot;
   const wk=getWeekMonday(curDate);
-  const tasks=getWeek(wk);
+  const tasks=getWeekTasks(wk);
   const day=getDay();
   const usedIds=day.top5.filter(Boolean).map(t=>t.fromWeekId).filter(Boolean);
 
@@ -1065,10 +1237,11 @@ function openTop5Sheet(slot){
     list.innerHTML=`<div class="empty"><div class="empty-text">주간 할 일이 없어요<br>주간 탭에서 먼저 추가해보세요</div></div>`;
   }else{
     list.innerHTML=available.map(t=>{
-      const qm=QUAD_META[t.quad]||QUAD_META.q4;
-      return`<div class="ei-task" style="background:var(--paper2);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;padding:10px 12px;" onclick="selectTop5Task('${t.id}','${t.text.replace(/'/g,"\\'")}')">
-        <div class="ei-quad-dot" style="background:${qm.dot};width:8px;height:8px;border-radius:50%;flex-shrink:0;"></div>
-        <div class="ei-task-text">${t.text}</div>
+      const q=getWeekTaskQuad(t.id,wk);
+      const qm=QUAD_META[q]||QUAD_META.q4;
+      return`<div style="display:flex;align-items:center;gap:8px;background:var(--paper2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;" onclick="selectTop5Task('${t.id}','${t.text.replace(/'/g,"\\'")}')">
+        <div style="width:8px;height:8px;border-radius:50%;background:${qm.dot};flex-shrink:0;"></div>
+        <div style="font-size:13px;color:var(--ink);flex:1;">${t.text}</div>
       </div>`;
     }).join('');
   }
@@ -1097,7 +1270,7 @@ function addTop5Direct(){
 // 나머지 (주간 중 오늘 미배정)
 function renderRemain(){
   const wk=getWeekMonday(curDate);
-  const tasks=getWeek(wk);
+  const tasks=getWeekTasks(wk);
   const day=getDay();
   const usedIds=day.top5.filter(Boolean).map(t=>t.fromWeekId).filter(Boolean);
   const remain=tasks.filter(t=>!t.done&&!usedIds.includes(t.id));
@@ -1107,7 +1280,8 @@ function renderRemain(){
     return;
   }
   el.innerHTML=remain.map(t=>{
-    const qm=QUAD_META[t.quad]||QUAD_META.q4;
+    const q=getWeekTaskQuad(t.id,wk);
+    const qm=QUAD_META[q]||QUAD_META.q4;
     return`<div class="remain-item">
       <div class="remain-quad-dot" style="background:${qm.dot}"></div>
       <div class="remain-text">${t.text}</div>
