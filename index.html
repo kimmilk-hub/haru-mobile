@@ -354,6 +354,32 @@ textarea.inp{resize:none;line-height:1.6;}
 .enrg-btn.on{border-color:var(--accent);background:var(--accent2);}
 .oneliner-inp{width:100%;background:none;border:none;border-bottom:1.5px solid var(--line2);padding:8px 0;font-size:13px;color:var(--ink);font-family:'Noto Sans KR',sans-serif;outline:none;}
 .oneliner-inp:focus{border-bottom-color:var(--accent);}
+
+/* ── 드래그 → 타임라인 ── */
+.top5-slot.filled{cursor:grab;}
+.top5-slot.dragging-task,.remain-item.dragging-task{opacity:.35;transform:scale(.98);}
+.remain-item{cursor:grab;}
+.hour-line.tl-over{
+  background:var(--accent2);border-radius:6px;
+  outline:2px dashed var(--accent);
+}
+.tl-ghost{
+  background:var(--accent2);border:1.5px dashed var(--accent);
+  border-radius:8px;padding:6px 10px;
+  font-size:11px;color:var(--accent);
+  font-family:'DM Mono',monospace;pointer-events:none;
+  margin:2px 6px 2px 0;
+}
+/* 터치 드래그 클론 */
+#tl-touch-clone{
+  position:fixed;z-index:9999;pointer-events:none;
+  background:var(--paper);border:1.5px solid var(--accent);
+  border-radius:10px;padding:8px 12px;
+  font-size:12px;color:var(--ink);
+  box-shadow:0 4px 16px rgba(0,0,0,.15);
+  max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transform:scale(1.05) rotate(-1deg);
+}
 </style>
 </head>
 <body>
@@ -1240,7 +1266,11 @@ function renderTop5(){
     const rank=i+1;
     const color=RANK_COLORS[i];
     if(task){
-      return`<div class="top5-slot filled${task.done?' done-slot':''}" >
+      return`<div class="top5-slot filled${task.done?' done-slot':''}"
+        draggable="true"
+        data-text="${task.text.replace(/"/g,'&quot;')}"
+        data-color="${color}"
+        data-idx="${i}">
         <div class="top5-rank" style="color:${color}">${rank}</div>
         <div class="top5-task-text" onclick="toggleTop5(${i})">${task.text}</div>
         <div class="top5-check${task.done?' done':''}" style="${task.done?`background:${color};border-color:${color}`:`border-color:${color}`}" onclick="toggleTop5(${i})">✓</div>
@@ -1253,6 +1283,17 @@ function renderTop5(){
       </div>`;
     }
   }).join('');
+  // 드래그 이벤트 붙이기
+  document.querySelectorAll('.top5-slot.filled[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      tlDragText=el.dataset.text;
+      tlDragColor=el.dataset.color||COLORS[0];
+      el.classList.add('dragging-task');
+      e.dataTransfer.effectAllowed='copy';
+    });
+    el.addEventListener('dragend',()=>el.classList.remove('dragging-task'));
+    el.addEventListener('touchstart',tlTouchStart,{passive:true});
+  });
 }
 
 function toggleTop5(idx){
@@ -1356,12 +1397,23 @@ function renderRemain(){
   el.innerHTML=remain.map(t=>{
     const q=getWeekTaskQuad(t.id,wk);
     const qm=QUAD_META[q]||QUAD_META.q4;
-    return`<div class="remain-item">
+    return`<div class="remain-item"
+      draggable="true"
+      data-text="${t.text.replace(/"/g,'&quot;')}"
+      data-color="${qm.dot}">
       <div class="remain-quad-dot" style="background:${qm.dot}"></div>
       <div class="remain-text">${t.text}</div>
-      <button class="remain-add-today" onclick="quickAddToTop5('${t.id}','${t.text.replace(/'/g,"\\'")}')">오늘 추가</button>
+      <button class="remain-add-today" onclick="event.stopPropagation();quickAddToTop5('${t.id}','${t.text.replace(/'/g,"\\'")}')">오늘 추가</button>
     </div>`;
   }).join('');
+  document.querySelectorAll('.remain-item[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      tlDragText=el.dataset.text; tlDragColor=el.dataset.color||COLORS[0];
+      el.classList.add('dragging-task'); e.dataTransfer.effectAllowed='copy';
+    });
+    el.addEventListener('dragend',()=>el.classList.remove('dragging-task'));
+    el.addEventListener('touchstart',tlTouchStart,{passive:true});
+  });
 }
 
 function quickAddToTop5(weekId,text){
@@ -1379,6 +1431,10 @@ function quickAddToTop5(weekId,text){
 let editBlockId=null;
 let blColor=COLORS[0];
 
+// ── 타임라인 드래그 상태 ──
+let tlDragText=null, tlDragColor=null;
+let tlTouchClone=null, tlTouchSrc=null, tlTouchTargetH=null;
+
 function renderTimeline(){
   const day=getDay();
   const blocks=day.blocks||[];
@@ -1387,10 +1443,15 @@ function renderTimeline(){
   const nowH=new Date().getHours();
   const isToday=dk(curDate)===dk(todayD());
   el.innerHTML=HOURS.map(h=>{
-    const hBlocks=blocks.filter(b=>parseInt(b.start)===h||parseInt(b.start?.split(':')[0])===h);
+    const pad=n=>String(n).padStart(2,'0');
+    const hBlocks=blocks.filter(b=>parseInt((b.start||'0').split(':')[0])===h);
     return`<div class="hour-row${isToday&&h===nowH?' now-row':''}">
       <div class="hour-label">${h===0?'':h+':00'}</div>
-      <div class="hour-line">
+      <div class="hour-line"
+        data-hour="${h}"
+        ondragover="tlDragOver(event,${h})"
+        ondragleave="tlDragLeave(event)"
+        ondrop="tlDrop(event,${h})">
         ${hBlocks.map(b=>`<button class="block-pill" style="background:${b.color||'#2b5c3f'}20;color:${b.color||'#2b5c3f'}" onclick="openBlockSheet('${b.id}')">
           <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${b.color||'#2b5c3f'};border-color:${b.color||'#2b5c3f'}`:`border-color:${b.color||'#2b5c3f'}`}" onclick="event.stopPropagation();toggleBlock('${b.id}')">✓</div>
           <div class="bp-title${b.done?' done':''}" style="color:${b.color||'#2b5c3f'}">${b.title}</div>
@@ -1400,6 +1461,96 @@ function renderTimeline(){
     </div>`;
   }).join('');
 }
+
+// ── 마우스 드롭 ──
+function tlDragOver(e, h){
+  if(!tlDragText)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='copy';
+  e.currentTarget.classList.add('tl-over');
+}
+function tlDragLeave(e){
+  e.currentTarget.classList.remove('tl-over');
+}
+function tlDrop(e, h){
+  e.preventDefault();
+  e.currentTarget.classList.remove('tl-over');
+  if(!tlDragText)return;
+  tlCreateBlock(tlDragText, tlDragColor, h);
+  tlDragText=null; tlDragColor=null;
+}
+
+function tlCreateBlock(title, color, startH){
+  const endH=Math.min(startH+1,23);
+  const pad=n=>String(n).padStart(2,'0');
+  const day=getDay();
+  if(!day.blocks)day.blocks=[];
+  day.blocks.push({
+    id:uid(), title,
+    start:`${pad(startH)}:00`,
+    end:`${pad(endH)}:00`,
+    color: color||COLORS[0],
+    done:false
+  });
+  renderTimeline(); renderDailyStats(); scheduleSave();
+  // 타임박스 자동 열기
+  const body=document.getElementById('timebox-body');
+  const arrow=document.getElementById('tb-arrow');
+  if(!body.classList.contains('open')){
+    body.classList.add('open'); arrow.classList.add('open');
+  }
+  // 해당 시간대로 스크롤
+  setTimeout(()=>{
+    const row=document.querySelector(`.hour-line[data-hour="${startH}"]`);
+    if(row)row.scrollIntoView({behavior:'smooth',block:'center'});
+  },100);
+}
+
+// ── 터치 드래그 (타임라인용) ──
+function tlTouchStart(e){
+  const el=e.currentTarget;
+  tlDragText=el.dataset.text;
+  tlDragColor=el.dataset.color||COLORS[0];
+  tlTouchSrc=el;
+  const t=e.touches[0];
+  // 클론
+  tlTouchClone=document.createElement('div');
+  tlTouchClone.id='tl-touch-clone';
+  tlTouchClone.textContent=tlDragText;
+  tlTouchClone.style.left=(t.clientX-80)+'px';
+  tlTouchClone.style.top=(t.clientY-20)+'px';
+  tlTouchClone.style.borderColor=tlDragColor;
+  document.body.appendChild(tlTouchClone);
+  el.classList.add('dragging-task');
+  document.addEventListener('touchmove', tlTouchMove, {passive:false});
+  document.addEventListener('touchend',  tlTouchEnd,  {once:true});
+}
+function tlTouchMove(e){
+  if(!tlTouchClone)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  tlTouchClone.style.left=(t.clientX-80)+'px';
+  tlTouchClone.style.top=(t.clientY-20)+'px';
+  // 어떤 hour-line 위에 있는지
+  tlTouchClone.style.display='none';
+  const under=document.elementFromPoint(t.clientX,t.clientY);
+  tlTouchClone.style.display='';
+  const hl=under?.closest('.hour-line');
+  document.querySelectorAll('.hour-line').forEach(l=>l.classList.remove('tl-over'));
+  if(hl){hl.classList.add('tl-over'); tlTouchTargetH=parseInt(hl.dataset.hour);}
+  else tlTouchTargetH=null;
+}
+function tlTouchEnd(){
+  document.removeEventListener('touchmove', tlTouchMove);
+  if(tlTouchClone){tlTouchClone.remove(); tlTouchClone=null;}
+  if(tlTouchSrc){tlTouchSrc.classList.remove('dragging-task'); tlTouchSrc=null;}
+  document.querySelectorAll('.hour-line').forEach(l=>l.classList.remove('tl-over'));
+  if(tlTouchTargetH!==null && tlDragText){
+    tlCreateBlock(tlDragText, tlDragColor, tlTouchTargetH);
+  }
+  tlDragText=null; tlDragColor=null; tlTouchTargetH=null;
+}
+
 
 function renderDailyStats(){
   const day=getDay();
