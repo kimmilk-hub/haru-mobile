@@ -380,6 +380,21 @@ textarea.inp{resize:none;line-height:1.6;}
   max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   transform:scale(1.05) rotate(-1deg);
 }
+/* 미완료 처리 버튼 */
+.bl-carry-btn{
+  background:var(--paper2);border:1.5px solid var(--line2);border-radius:8px;
+  padding:7px 10px;font-size:11px;color:var(--ink2);cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;transition:all .13s;
+}
+.bl-carry-btn:active{background:var(--accent2);border-color:var(--accent);}
+/* 빠른 시간 칩 */
+.bl-quick-chip{
+  background:var(--paper2);border:1.5px solid var(--line2);border-radius:20px;
+  padding:5px 10px;font-size:11px;color:var(--ink2);cursor:pointer;
+  font-family:'DM Mono',monospace;transition:all .13s;white-space:nowrap;
+}
+.bl-quick-chip.on{background:var(--accent2);border-color:var(--accent);color:var(--accent);}
+.bl-quick-chip:active{background:var(--accent2);}
 </style>
 </head>
 <body>
@@ -602,34 +617,67 @@ textarea.inp{resize:none;line-height:1.6;}
   </div>
 </div>
 
-<!-- 타임박스 블록 추가 -->
+<!-- 타임박스 블록 추가/수정 -->
 <div class="sheet-bg" id="block-sheet">
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="block-sheet-title">블록 추가</div>
+
+    <!-- 할 일 선택 -->
     <div class="field-wrap">
-      <label class="field-label">할 일 (TOP5에서 선택 또는 입력)</label>
+      <label class="field-label">할 일</label>
       <select class="inp" id="bl-task-select" style="cursor:pointer;"></select>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <div class="field-wrap" style="flex:1;margin-bottom:0;">
-        <label class="field-label">시작</label>
-        <input class="inp" id="bl-start" type="time" value="09:00">
-      </div>
-      <div class="field-wrap" style="flex:1;margin-bottom:0;">
-        <label class="field-label">종료</label>
-        <input class="inp" id="bl-end" type="time" value="10:00">
+
+    <!-- 직접 입력 (select가 "직접입력" 선택 시 표시) -->
+    <div class="field-wrap" id="bl-custom-wrap" style="display:none;">
+      <input class="inp" id="bl-custom-text" placeholder="할 일 직접 입력…">
+    </div>
+
+    <!-- 시간 선택 -->
+    <div class="field-wrap">
+      <label class="field-label">시간</label>
+      <!-- 빠른 선택 칩 -->
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;" id="bl-quick-times"></div>
+      <!-- 직접 입력 -->
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="inp" id="bl-start" type="time" value="09:00" style="flex:1;">
+        <span style="color:var(--gray);font-size:13px;">–</span>
+        <input class="inp" id="bl-end" type="time" value="10:00" style="flex:1;">
       </div>
     </div>
+
+    <!-- 소요 시간 표시 -->
+    <div style="font-size:11px;color:var(--gray);margin:-6px 0 10px;font-family:'DM Mono',monospace;" id="bl-duration-label"></div>
+
+    <!-- 메모 -->
+    <div class="field-wrap">
+      <label class="field-label">메모 (선택)</label>
+      <textarea class="inp" id="bl-memo" placeholder="참고 사항, 링크, 세부 내용…" rows="3" style="resize:none;line-height:1.6;"></textarea>
+    </div>
+
+    <!-- 색상 -->
     <div class="field-wrap">
       <label class="field-label">색상</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;" id="bl-colors"></div>
     </div>
+
+    <!-- 미완료 처리 (수정 시에만 표시) -->
+    <div id="bl-carryover-wrap" style="display:none;margin-bottom:12px;">
+      <div style="height:1px;background:var(--line);margin-bottom:12px;"></div>
+      <label class="field-label">미완료 처리</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="bl-carryover-btns">
+        <button class="bl-carry-btn" data-action="tomorrow" onclick="carryoverBlock('tomorrow')">📅 내일로 넘기기</button>
+        <button class="bl-carry-btn" data-action="next" onclick="carryoverBlock('next')">⏭ 다음 주 이동</button>
+        <button class="bl-carry-btn" data-action="keep" onclick="carryoverBlock('keep')">🔁 반복 (매일)</button>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeSheet('block-sheet')">취소</button>
-      <button class="btn-primary" onclick="saveBlock()">추가</button>
+      <button class="btn-primary" onclick="saveBlock()">저장</button>
     </div>
-    <button class="btn-danger" id="bl-del-btn" style="display:none;" onclick="deleteBlock()">삭제</button>
+    <button class="btn-danger" id="bl-del-btn" style="display:none;" onclick="deleteBlock()">블록 삭제</button>
   </div>
 </div>
 
@@ -1452,11 +1500,20 @@ function renderTimeline(){
         ondragover="tlDragOver(event,${h})"
         ondragleave="tlDragLeave(event)"
         ondrop="tlDrop(event,${h})">
-        ${hBlocks.map(b=>`<button class="block-pill" style="background:${b.color||'#2b5c3f'}20;color:${b.color||'#2b5c3f'}" onclick="openBlockSheet('${b.id}')">
-          <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${b.color||'#2b5c3f'};border-color:${b.color||'#2b5c3f'}`:`border-color:${b.color||'#2b5c3f'}`}" onclick="event.stopPropagation();toggleBlock('${b.id}')">✓</div>
-          <div class="bp-title${b.done?' done':''}" style="color:${b.color||'#2b5c3f'}">${b.title}</div>
-          <div class="bp-time" style="color:${b.color||'#2b5c3f'}">${b.start}–${b.end}</div>
-        </button>`).join('')}
+        ${hBlocks.map(b=>{
+          const c=b.color||'#2b5c3f';
+          const carried=b.carriedFrom?` <span style="font-size:9px;opacity:.7">↩</span>`:'';
+          const hasMemo=b.memo?` <span style="font-size:9px;opacity:.7">✎</span>`:'';
+          const repeat=b.repeat?` <span style="font-size:9px;opacity:.7">🔁</span>`:'';
+          return`<button class="block-pill" style="background:${c}18;border:1px solid ${c}40;" onclick="openBlockSheet('${b.id}')">
+            <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${c};border-color:${c}`:`border-color:${c}`}" onclick="event.stopPropagation();toggleBlock('${b.id}')">✓</div>
+            <div style="flex:1;min-width:0;">
+              <div class="bp-title${b.done?' done':''}" style="color:${c}">${b.title}${carried}${hasMemo}${repeat}</div>
+              ${b.memo?`<div style="font-size:10px;color:${c};opacity:.7;line-height:1.4;margin-top:2px;white-space:normal;">${b.memo}</div>`:''}
+            </div>
+            <div class="bp-time" style="color:${c}">${b.start}–${b.end}</div>
+          </button>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
@@ -1569,59 +1626,194 @@ function toggleTimebox(){
   arrow.classList.toggle('open',body.classList.contains('open'));
 }
 
+// 빠른 시간 선택 옵션
+const QUICK_TIMES=[
+  {label:'30분',m:30},{label:'1시간',m:60},{label:'1.5시간',m:90},
+  {label:'2시간',m:120},{label:'3시간',m:180},{label:'반나절',m:240},{label:'하루종일',m:480}
+];
+
+function timeToMin(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+function minToTime(m){return`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;}
+function calcDuration(){
+  const s=timeToMin(document.getElementById('bl-start').value||'09:00');
+  const e=timeToMin(document.getElementById('bl-end').value||'10:00');
+  const diff=e>s?e-s:0;
+  const h=Math.floor(diff/60), m=diff%60;
+  const label=document.getElementById('bl-duration-label');
+  if(!diff){label.textContent='';return;}
+  label.textContent=`⏱ ${h?h+'시간 ':''}${m?m+'분':''}`;
+  // 빠른 칩 하이라이트
+  document.querySelectorAll('.bl-quick-chip').forEach(c=>{
+    c.classList.toggle('on',parseInt(c.dataset.m)===diff);
+  });
+}
+
+function renderQuickTimes(startMin){
+  const wrap=document.getElementById('bl-quick-times');
+  wrap.innerHTML=QUICK_TIMES.map(q=>{
+    const endMin=startMin+q.m;
+    const endTime=minToTime(endMin);
+    return`<button class="bl-quick-chip" data-m="${q.m}" onclick="applyQuickTime(${q.m})">${q.label}</button>`;
+  }).join('');
+}
+
+function applyQuickTime(m){
+  const s=timeToMin(document.getElementById('bl-start').value||'09:00');
+  document.getElementById('bl-end').value=minToTime(s+m);
+  calcDuration();
+}
+
 function openBlockSheet(id=null){
   editBlockId=id;
   blColor=COLORS[0];
   const day=getDay();
-  // TOP5 목록을 select에
+
+  // 할 일 목록 — TOP5 + 오늘 덤프
   const sel=document.getElementById('bl-task-select');
   const top5=day.top5.filter(Boolean);
-  sel.innerHTML=`<option value="">직접 입력…</option>`+top5.map(t=>`<option value="${t.text}">${t.text}</option>`).join('');
+  const dumps=(day.dump||[]);
+  let opts=`<option value="">직접 입력…</option>`;
+  if(top5.length) opts+=`<optgroup label="TOP 5">`+top5.map(t=>`<option value="${t.text}">${t.text}</option>`).join('')+`</optgroup>`;
+  if(dumps.length) opts+=`<optgroup label="오늘 덤프">`+dumps.map(d=>`<option value="${d.text}">${d.text}</option>`).join('')+`</optgroup>`;
+  sel.innerHTML=opts;
+  sel.onchange=()=>{
+    document.getElementById('bl-custom-wrap').style.display=sel.value===''?'block':'none';
+  };
+
   if(id){
     const b=(day.blocks||[]).find(x=>x.id===id);
     if(!b)return;
+    // 선택값 복원 (없으면 직접입력에 채움)
     sel.value=b.title;
-    if(!sel.value){sel.options[0].text=b.title;sel.value='';}
+    if(!sel.value){
+      sel.value='';
+      document.getElementById('bl-custom-wrap').style.display='block';
+      document.getElementById('bl-custom-text').value=b.title;
+    } else {
+      document.getElementById('bl-custom-wrap').style.display='none';
+    }
     document.getElementById('bl-start').value=b.start||'09:00';
     document.getElementById('bl-end').value=b.end||'10:00';
+    document.getElementById('bl-memo').value=b.memo||'';
     blColor=b.color||COLORS[0];
     document.getElementById('bl-del-btn').style.display='block';
+    document.getElementById('bl-carryover-wrap').style.display='block';
     document.getElementById('block-sheet-title').textContent='블록 수정';
   }else{
     sel.value='';
+    document.getElementById('bl-custom-wrap').style.display='none';
+    document.getElementById('bl-custom-text').value='';
+    // 현재 시간으로 기본값
+    const now=new Date();
+    const nowMin=now.getHours()*60+Math.ceil(now.getMinutes()/30)*30;
+    document.getElementById('bl-start').value=minToTime(nowMin);
+    document.getElementById('bl-end').value=minToTime(nowMin+60);
+    document.getElementById('bl-memo').value='';
     document.getElementById('bl-del-btn').style.display='none';
+    document.getElementById('bl-carryover-wrap').style.display='none';
     document.getElementById('block-sheet-title').textContent='블록 추가';
   }
+
+  const startMin=timeToMin(document.getElementById('bl-start').value);
+  renderQuickTimes(startMin);
+  calcDuration();
   renderColorPicker('bl-colors',blColor,c=>{blColor=c;});
   document.getElementById('block-sheet').classList.add('show');
 }
 
+// 시간 변경 시 소요시간 업데이트
+document.getElementById('bl-start').addEventListener('change',()=>{
+  renderQuickTimes(timeToMin(document.getElementById('bl-start').value));
+  calcDuration();
+});
+document.getElementById('bl-end').addEventListener('change',calcDuration);
+
 function saveBlock(){
   const sel=document.getElementById('bl-task-select');
-  const title=sel.value||sel.options[sel.selectedIndex]?.text||'';
+  const title=sel.value||document.getElementById('bl-custom-text').value.trim()||'';
   if(!title||title==='직접 입력…')return;
   const start=document.getElementById('bl-start').value;
   const end=document.getElementById('bl-end').value;
+  const memo=document.getElementById('bl-memo').value.trim();
+  if(timeToMin(end)<=timeToMin(start)){alert('종료 시간이 시작 시간보다 늦어야 해요');return;}
   const day=getDay();
   if(!day.blocks)day.blocks=[];
   if(editBlockId){
     const b=day.blocks.find(x=>x.id===editBlockId);
-    if(b){b.title=title;b.start=start;b.end=end;b.color=blColor;}
+    if(b){b.title=title;b.start=start;b.end=end;b.color=blColor;b.memo=memo;}
   }else{
-    day.blocks.push({id:uid(),title,start,end,color:blColor,done:false});
+    day.blocks.push({id:uid(),title,start,end,color:blColor,memo,done:false});
   }
   closeSheet('block-sheet');renderTimeline();renderDailyStats();scheduleSave();
 }
+
 function deleteBlock(){
   const day=getDay();
   day.blocks=(day.blocks||[]).filter(x=>x.id!==editBlockId);
   closeSheet('block-sheet');renderTimeline();renderDailyStats();scheduleSave();
 }
+
 function toggleBlock(id){
   const day=getDay();
   const b=(day.blocks||[]).find(x=>x.id===id);
   if(b){b.done=!b.done;}
   renderTimeline();renderDailyStats();scheduleSave();
+}
+
+// ── 미완료 처리 ──
+function carryoverBlock(action){
+  const day=getDay();
+  const b=(day.blocks||[]).find(x=>x.id===editBlockId);
+  if(!b)return;
+
+  if(action==='tomorrow'){
+    // 내일 같은 시간대에 복사
+    const tomorrow=new Date(curDate);
+    tomorrow.setDate(tomorrow.getDate()+1);
+    const tk=dk(tomorrow);
+    if(!daily[tk])daily[tk]={top5:[],blocks:[],review:{energy:0,good:'',bad:'',learn:'',next:'',oneliner:''}};
+    if(!daily[tk].blocks)daily[tk].blocks=[];
+    daily[tk].blocks.push({...b,id:uid(),done:false,carriedFrom:dk(curDate)});
+    closeSheet('block-sheet');
+    scheduleSave();
+    // 안내 토스트
+    showToast(`📅 내일(${tomorrow.getMonth()+1}/${tomorrow.getDate()})로 넘겼어요`);
+
+  }else if(action==='next'){
+    // 다음 주 월요일로
+    const nxtMon=getWeekMonday(curDate);
+    nxtMon.setDate(nxtMon.getDate()+7);
+    const tk=dk(nxtMon);
+    if(!daily[tk])daily[tk]={top5:[],blocks:[],review:{energy:0,good:'',bad:'',learn:'',next:'',oneliner:''}};
+    if(!daily[tk].blocks)daily[tk].blocks=[];
+    daily[tk].blocks.push({...b,id:uid(),done:false,carriedFrom:dk(curDate)});
+    closeSheet('block-sheet');
+    scheduleSave();
+    showToast(`⏭ 다음 주 월요일로 넘겼어요`);
+
+  }else if(action==='keep'){
+    // 반복 플래그 토글
+    b.repeat=!b.repeat;
+    const label=document.querySelector('.bl-carry-btn[data-action="keep"]');
+    if(label)label.style.background=b.repeat?'var(--accent2)':'';
+    scheduleSave();
+    showToast(b.repeat?'🔁 매일 반복으로 설정됐어요':'반복 해제됐어요');
+  }
+}
+
+// 토스트
+function showToast(msg){
+  let t=document.getElementById('toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='toast';
+    t.style.cssText='position:fixed;bottom:calc(var(--tab-h) + var(--safe-bot) + 70px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:white;padding:10px 18px;border-radius:20px;font-size:12px;z-index:9999;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(10px)';},2200);
 }
 
 // 색상 피커
