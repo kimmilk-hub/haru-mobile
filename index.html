@@ -425,10 +425,20 @@ textarea.inp{resize:none;line-height:1.6;}
 
 <!-- ▌탭4: 일간 -->
 <div class="view" id="view4">
+  <!-- 오늘 브레인덤프 -->
+  <div class="wk-dump-area" style="border-bottom:1px solid var(--line);">
+    <div class="wk-dump-label">오늘 브레인덤프</div>
+    <div class="wk-dump-inp-row">
+      <input class="inp wk-dump-inp" id="day-dump-inp" placeholder="오늘 떠오른 할 일…">
+      <button class="wk-dump-add" onclick="addDayDump()">+</button>
+    </div>
+    <div class="wk-dump-pool" id="day-dump-pool"></div>
+  </div>
+
   <!-- TOP 5 -->
   <div class="top5-section">
     <div class="top5-title">오늘의 TOP 5</div>
-    <div class="top5-sub">주간 할 일에서 오늘 할 것을 골라요</div>
+    <div class="top5-sub">주간 할 일 또는 오늘 덤프에서 골라요</div>
     <div id="top5-list"></div>
   </div>
 
@@ -1176,11 +1186,45 @@ function getWeekTaskQuad(id,monday=curWeekMonday){
 
 
 // ══════════════════════════════════════════
-// 일간 뷰
+// 일간 브레인덤프
 // ══════════════════════════════════════════
-let top5SheetSlot=null; // 어느 슬롯에 넣을 건지
+function addDayDump(){
+  const inp=document.getElementById('day-dump-inp');
+  const text=inp.value.trim();if(!text)return;
+  const day=getDay();
+  if(!day.dump)day.dump=[];
+  day.dump.push({id:uid(),text});
+  inp.value='';
+  renderDayDump();scheduleSave();
+}
+document.getElementById('day-dump-inp').addEventListener('keydown',e=>{if(e.key==='Enter')addDayDump();});
+
+function renderDayDump(){
+  const day=getDay();
+  const dumps=day.dump||[];
+  const usedIds=new Set((day.top5||[]).filter(Boolean).map(t=>t.fromDayDumpId).filter(Boolean));
+  const pool=document.getElementById('day-dump-pool');
+  pool.innerHTML=dumps.length
+    ? dumps.map(chip=>{
+        const used=usedIds.has(chip.id);
+        return`<div class="dump-chip${used?' assigned':''}">
+          ${chip.text}
+          <button class="dump-chip-del" onclick="removeDayDump('${chip.id}')">×</button>
+        </div>`;
+      }).join('')
+    : `<div style="font-size:11px;color:var(--gray2);padding:4px 0;">오늘 새로 생긴 할 일을 입력하세요</div>`;
+}
+
+function removeDayDump(id){
+  const day=getDay();
+  day.dump=(day.dump||[]).filter(c=>c.id!==id);
+  renderDayDump();scheduleSave();
+}
+
+
 
 function renderDay(){
+  renderDayDump();
   renderTop5();
   renderRemain();
   renderTimeline();
@@ -1226,25 +1270,47 @@ function removeTop5(idx){
 function openTop5Sheet(slot){
   top5SheetSlot=slot;
   const wk=getWeekMonday(curDate);
-  const tasks=getWeekTasks(wk);
+  const weekTasks=getWeekTasks(wk);
   const day=getDay();
-  const usedIds=day.top5.filter(Boolean).map(t=>t.fromWeekId).filter(Boolean);
+  const usedWeekIds=new Set((day.top5||[]).filter(Boolean).map(t=>t.fromWeekId).filter(Boolean));
+  const usedDumpIds=new Set((day.top5||[]).filter(Boolean).map(t=>t.fromDayDumpId).filter(Boolean));
 
   document.getElementById('top5-sheet-title').textContent=`${slot+1}순위 선택`;
   const list=document.getElementById('top5-pick-list');
-  const available=tasks.filter(t=>!t.done&&!usedIds.includes(t.id));
-  if(!available.length){
-    list.innerHTML=`<div class="empty"><div class="empty-text">주간 할 일이 없어요<br>주간 탭에서 먼저 추가해보세요</div></div>`;
-  }else{
-    list.innerHTML=available.map(t=>{
+
+  const availWeek=weekTasks.filter(t=>!t.done&&!usedWeekIds.has(t.id));
+  const availDump=(day.dump||[]).filter(d=>!usedDumpIds.has(d.id));
+
+  let html='';
+
+  // 오늘 덤프
+  if(availDump.length){
+    html+=`<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--gray);font-family:'DM Mono',monospace;text-transform:uppercase;margin-bottom:6px;">오늘 브레인덤프</div>`;
+    html+=availDump.map(d=>`
+      <div style="display:flex;align-items:center;gap:8px;background:var(--gold2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:5px;cursor:pointer;" onclick="selectTop5DayDump('${d.id}','${d.text.replace(/'/g,"\\'")}')">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;"></div>
+        <div style="font-size:13px;color:var(--ink);flex:1;">${d.text}</div>
+      </div>`).join('');
+  }
+
+  // 주간 할 일
+  if(availWeek.length){
+    html+=`<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--gray);font-family:'DM Mono',monospace;text-transform:uppercase;margin:10px 0 6px;">주간 할 일</div>`;
+    html+=availWeek.map(t=>{
       const q=getWeekTaskQuad(t.id,wk);
       const qm=QUAD_META[q]||QUAD_META.q4;
-      return`<div style="display:flex;align-items:center;gap:8px;background:var(--paper2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;" onclick="selectTop5Task('${t.id}','${t.text.replace(/'/g,"\\'")}')">
+      return`<div style="display:flex;align-items:center;gap:8px;background:var(--paper2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:5px;cursor:pointer;" onclick="selectTop5Task('${t.id}','${t.text.replace(/'/g,"\\'")}')">
         <div style="width:8px;height:8px;border-radius:50%;background:${qm.dot};flex-shrink:0;"></div>
         <div style="font-size:13px;color:var(--ink);flex:1;">${t.text}</div>
       </div>`;
     }).join('');
   }
+
+  if(!availDump.length&&!availWeek.length){
+    html=`<div class="empty"><div class="empty-text">할 일이 없어요<br>위쪽 덤프나 주간 탭에서 먼저 추가해보세요</div></div>`;
+  }
+
+  list.innerHTML=html;
   document.getElementById('top5-direct-inp').value='';
   document.getElementById('top5-sheet').classList.add('show');
 }
@@ -1252,9 +1318,17 @@ function openTop5Sheet(slot){
 function selectTop5Task(weekId,text){
   const day=getDay();
   while(day.top5.length<=top5SheetSlot)day.top5.push(null);
-  day.top5[top5SheetSlot]={id:uid(),text,fromWeekId:weekId,done:false};
+  day.top5[top5SheetSlot]={id:uid(),text,fromWeekId:weekId,fromDayDumpId:null,done:false};
   closeSheet('top5-sheet');
-  renderTop5();scheduleSave();
+  renderTop5();renderDayDump();scheduleSave();
+}
+
+function selectTop5DayDump(dumpId,text){
+  const day=getDay();
+  while(day.top5.length<=top5SheetSlot)day.top5.push(null);
+  day.top5[top5SheetSlot]={id:uid(),text,fromWeekId:null,fromDayDumpId:dumpId,done:false};
+  closeSheet('top5-sheet');
+  renderTop5();renderDayDump();scheduleSave();
 }
 
 function addTop5Direct(){
@@ -1262,7 +1336,7 @@ function addTop5Direct(){
   const text=inp.value.trim();if(!text)return;
   const day=getDay();
   while(day.top5.length<=top5SheetSlot)day.top5.push(null);
-  day.top5[top5SheetSlot]={id:uid(),text,fromWeekId:null,done:false};
+  day.top5[top5SheetSlot]={id:uid(),text,fromWeekId:null,fromDayDumpId:null,done:false};
   closeSheet('top5-sheet');
   renderTop5();scheduleSave();
 }
