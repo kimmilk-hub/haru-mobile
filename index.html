@@ -258,6 +258,20 @@ textarea.inp{resize:none;line-height:1.6;}
 .dp-go{font-size:11px;color:var(--accent);cursor:pointer;}
 .dp-block{font-size:11px;color:var(--ink2);padding:5px 8px;background:white;border-radius:6px;margin-bottom:4px;border-left:3px solid var(--accent);}
 .dp-event{font-size:11px;color:var(--gold);padding:4px 8px;background:var(--gold2);border-radius:6px;margin-bottom:4px;}
+/* ── 이모지 피커 ── */
+.emoji-picker-wrap{margin:6px 0;}
+.emoji-cats{display:flex;gap:6px;margin-bottom:8px;}
+.emoji-cat-btn{flex:1;padding:5px 0;border:1.5px solid var(--line2);border-radius:8px;background:var(--paper2);font-size:11px;cursor:pointer;transition:all .1s;color:var(--ink);}
+.emoji-cat-btn.active{border-color:var(--accent);background:var(--accent2);color:var(--accent);font-weight:600;}
+.emoji-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.emoji-btn{font-size:21px;padding:4px 2px;border:none;background:transparent;cursor:pointer;border-radius:8px;line-height:1;transition:background .1s;text-align:center;}
+.emoji-btn:hover,.emoji-btn:active{background:var(--line);}
+.emoji-btn.selected{background:var(--accent2);outline:2px solid var(--accent);}
+.emoji-custom-row{display:flex;gap:6px;margin-top:8px;align-items:center;}
+.emoji-selected-preview{font-size:26px;min-width:32px;text-align:center;}
+.mc-emojis{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;margin-top:1px;}
+.mc-emoji{font-size:12px;line-height:1;}
+.wk-ev-chip{display:inline-flex;align-items:center;gap:2px;background:var(--gold2);border-radius:10px;padding:2px 7px;font-size:11px;color:#7a5a00;margin:2px 2px 0 0;}
 .dp-empty{font-size:11px;color:var(--gray);font-style:italic;}
 .proj-add-btn{display:block;width:calc(100% - 24px);margin:6px 12px;background:none;border:1px dashed var(--line2);border-radius:8px;padding:7px;color:var(--gray);font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
 
@@ -332,6 +346,7 @@ textarea.inp{resize:none;line-height:1.6;}
         <div class="pb-track"><div class="pb-fill" id="pb-fill" style="width:0%"></div></div>
         <div class="pb-pct" id="pb-pct">0%</div>
       </div>
+      <div id="wk-ev-row" style="padding:4px 16px 2px;min-height:0;"></div>
       <div class="dump-area">
         <div class="mono-label">이번 주 할 일 쏟아내기</div>
         <div class="dump-inp-row">
@@ -443,7 +458,27 @@ textarea.inp{resize:none;line-height:1.6;}
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="ev-sheet-title">이벤트 추가</div>
     <div class="field"><label class="field-label">날짜</label><input class="inp" id="ev-date" type="date"></div>
-    <div class="field"><label class="field-label">내용</label><input class="inp" id="ev-text" placeholder="예: 엄마 생신 🎂"></div>
+    <div class="field"><label class="field-label">내용</label><input class="inp" id="ev-text" placeholder="예: 엄마 생신"></div>
+    <div class="field">
+      <label class="field-label" style="display:flex;align-items:center;gap:8px;">
+        이모지 <span id="ev-emoji-preview" style="font-size:22px;line-height:1;"></span>
+      </label>
+      <div class="emoji-picker-wrap">
+        <div class="emoji-cats">
+          <button class="emoji-cat-btn active" onclick="switchEmojiCat(this,'할일')">📚 할일</button>
+          <button class="emoji-cat-btn" onclick="switchEmojiCat(this,'감정')">😊 감정</button>
+          <button class="emoji-cat-btn" onclick="switchEmojiCat(this,'상태')">⚡ 상태</button>
+          <button class="emoji-cat-btn" onclick="switchEmojiCat(this,'기념')">🎉 기념</button>
+        </div>
+        <div class="emoji-grid" id="emoji-grid"></div>
+        <div class="emoji-custom-row">
+          <span style="font-size:12px;color:var(--gray);">직접입력</span>
+          <input class="inp emoji-custom-inp" id="emoji-custom" maxlength="2" placeholder="✍️" style="width:60px;font-size:20px;text-align:center;"
+            oninput="selectCustomEmoji(this.value)">
+          <button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="clearEvEmoji()">없음</button>
+        </div>
+      </div>
+    </div>
     <div class="field"><label class="field-label">색상</label><div class="color-row" id="ev-colors"></div></div>
     <div class="btn-row">
       <button class="btn-ghost" onclick="closeSheet('ev-sheet')">취소</button>
@@ -711,17 +746,69 @@ function renderYear(){
   document.getElementById('year-grid').innerHTML=html;
   const evYear=events.filter(e=>e.date.startsWith(String(curYear))).sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('ev-list').innerHTML=evYear.length
-    ? evYear.map(e=>{const d=parseD(e.date);return`<div class="ev-item"><div class="ev-date">${d.getMonth()+1}/${d.getDate()}</div><div class="ev-dot" style="background:${e.color||COLORS[0]}"></div><div class="ev-text">${e.text}</div><button class="ev-edit" onclick="openEvSheet('${e.id}')">✎</button></div>`;}).join('')
+    ? evYear.map(e=>{const d=parseD(e.date);return`<div class="ev-item"><div class="ev-date">${d.getMonth()+1}/${d.getDate()}</div><div class="ev-dot" style="background:${e.color||COLORS[0]}"></div>${e.emoji?`<span style="font-size:16px;">${e.emoji}</span>`:''}<div class="ev-text">${e.text}</div><button class="ev-edit" onclick="openEvSheet('${e.id}')">✎</button></div>`;}).join('')
     : `<div class="empty"><div class="empty-text">이벤트가 없어요</div></div>`;
 }
 function yearDayClick(key){document.getElementById('ev-date').value=key;openEvSheet(null,key);}
+
+// ── 이모지 피커 ──
+const EMOJI_CATS={
+  할일:['📚','✏️','💪','🍽️','🛁','🏃','💤','🎮','🎵','🎨','🛒','💊','📞','💻','🧹','💰'],
+  감정:['😊','😄','🥰','😎','😤','😢','😴','🤔','😰','🔥','❄️','🌊','⭐','💫','🌈','🫶'],
+  상태:['✅','⚡','⚠️','🔴','🟡','🟢','⏰','🔒','📌','🚀','🛑','💬','📢','🎯','🔁','🆕'],
+  기념:['🎉','🎂','🎁','🥳','💒','🌸','🍾','🏆','🎓','✈️','🏠','👶','💍','🙏','❤️','🫂'],
+};
+let curEmojiCat='할일', selectedEmoji='';
+
+function initEmojiPicker(){
+  renderEmojiGrid();
+  document.getElementById('emoji-custom').value='';
+}
+function renderEmojiGrid(){
+  const emojis=EMOJI_CATS[curEmojiCat]||[];
+  document.getElementById('emoji-grid').innerHTML=emojis.map(e=>
+    `<button class="emoji-btn${selectedEmoji===e?' selected':''}" onclick="selectEmoji('${e}')">${e}</button>`
+  ).join('');
+}
+function switchEmojiCat(btn,cat){
+  curEmojiCat=cat;
+  document.querySelectorAll('.emoji-cat-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEmojiGrid();
+}
+function selectEmoji(e){
+  selectedEmoji=e;
+  document.getElementById('ev-emoji-preview').textContent=e;
+  document.getElementById('emoji-custom').value='';
+  renderEmojiGrid();
+}
+function selectCustomEmoji(val){
+  if(!val)return;
+  // 이모지 문자만 허용 (첫 그래핀 클러스터)
+  const seg=[...new Intl.Segmenter().segment(val)];
+  const first=seg[0]?.segment||'';
+  selectedEmoji=first;
+  document.getElementById('ev-emoji-preview').textContent=first;
+  renderEmojiGrid();
+}
+function clearEvEmoji(){
+  selectedEmoji='';
+  document.getElementById('ev-emoji-preview').textContent='';
+  document.getElementById('emoji-custom').value='';
+  renderEmojiGrid();
+}
+
 function openEvSheet(id=null,prefill=null){
-  editEvId=id; evColor=COLORS[0];
+  editEvId=id; evColor=COLORS[0]; selectedEmoji='';
+  initEmojiPicker();
   if(id){
     const e=events.find(x=>x.id===id);if(!e)return;
     document.getElementById('ev-date').value=e.date;
     document.getElementById('ev-text').value=e.text;
     evColor=e.color||COLORS[0];
+    selectedEmoji=e.emoji||'';
+    document.getElementById('ev-emoji-preview').textContent=selectedEmoji;
+    renderEmojiGrid();
     document.getElementById('ev-del').style.display='block';
     document.getElementById('ev-sheet-title').textContent='이벤트 수정';
   } else {
@@ -737,8 +824,9 @@ function saveEv(){
   const date=document.getElementById('ev-date').value;
   const text=document.getElementById('ev-text').value.trim();
   if(!date||!text)return;
-  if(editEvId){const e=events.find(x=>x.id===editEvId);if(e){e.date=date;e.text=text;e.color=evColor;}}
-  else events.push({id:uid(),date,text,color:evColor});
+  const emoji=selectedEmoji||'';
+  if(editEvId){const e=events.find(x=>x.id===editEvId);if(e){e.date=date;e.text=text;e.color=evColor;e.emoji=emoji;}}
+  else events.push({id:uid(),date,text,color:evColor,emoji});
   closeSheet('ev-sheet');renderYear();scheduleSave();
 }
 function deleteEv(){events=events.filter(e=>e.id!==editEvId);closeSheet('ev-sheet');renderYear();scheduleSave();}
@@ -793,14 +881,16 @@ function renderMonth(){
         const isT=key===todayK, isSel=key===selDayKey;
         const dayData=daily[key];
         const colors=[...new Set((dayData?.blocks||[]).map(b=>b.color||'#2b5c3f'))].slice(0,3);
-        const hasEv=evDates.has(key);
+        const dayEvs=events.filter(e=>e.date===key);
         const numCls='mc-n'+(dow===0?' sun':dow===6?' sat':'');
+        const emojiStr=dayEvs.filter(e=>e.emoji).map(e=>`<span class="mc-emoji">${e.emoji}</span>`).join('');
         weekHtml+=`<div class="mc${isT?' today':''}${isSel?' selected':''}" id="mc-${key}" style="padding-bottom:${projPad+3}px;" onclick="selectDay('${key}')">
           <div class="${numCls}">${cell.d}</div>
           <div class="mc-dots">
             ${colors.map(c=>`<div class="mc-dot" style="background:${c}"></div>`).join('')}
-            ${hasEv?`<div class="mc-dot" style="background:var(--gold)"></div>`:''}
+            ${dayEvs.length&&!emojiStr?`<div class="mc-dot" style="background:var(--gold)"></div>`:''}
           </div>
+          ${emojiStr?`<div class="mc-emojis">${emojiStr}</div>`:''}
         </div>`;
       }
     });
@@ -858,7 +948,7 @@ function showDayPanel(key){
   const dayEv=events.filter(e=>e.date===key);
   const top5=dayData.top5||[];
   let html=`<div class="dp-title">${m}월 ${d}일 (${KO_DAYS[new Date(y,m-1,d).getDay()]})<span class="dp-go" onclick="goToDay('${key}')">일간으로 →</span></div>`;
-  dayEv.forEach(e=>html+=`<div class="dp-event">🎉 ${e.text}</div>`);
+  dayEv.forEach(e=>html+=`<div class="dp-event">${e.emoji||'🗓️'} ${e.text}</div>`);
   top5.filter(Boolean).forEach((t,i)=>html+=`<div class="dp-block" style="border-color:${RANK_COLORS[i]}">${t.done?'✓ ':''}${t.text}</div>`);
   if(!dayEv.length&&!top5.filter(Boolean).length)html+=`<div class="dp-empty">기록이 없어요</div>`;
   const panel=document.getElementById('day-panel');
@@ -909,6 +999,19 @@ function renderWeek(){
   const pct=all.length?Math.round(done/all.length*100):0;
   document.getElementById('pb-fill').style.width=pct+'%';
   document.getElementById('pb-pct').textContent=pct+'%';
+
+  // 이번 주 이벤트 이모지
+  const mon=curWeekMon;
+  const wkEvs=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(d.getDate()+i);
+    const key=dk(d);
+    events.filter(e=>e.date===key).forEach(e=>wkEvs.push({...e,dayLabel:['일','월','화','수','목','금','토'][d.getDay()]}));
+  }
+  const wkEvEl=document.getElementById('wk-ev-row');
+  wkEvEl.innerHTML=wkEvs.length
+    ? wkEvs.map(e=>`<span class="wk-ev-chip">${e.emoji||'🗓️'} ${e.dayLabel} ${e.text}</span>`).join('')
+    : '';
 
   // 덤프 풀
   const assignedIds=new Set(all.map(t=>t.id));
@@ -1324,7 +1427,12 @@ function renderTLStats(){
   const day=getDay();
   const t5d=day.top5.filter(t=>t?.done).length,t5t=day.top5.filter(Boolean).length;
   const bld=(day.blocks||[]).filter(b=>b.done).length,blt=(day.blocks||[]).length;
-  document.getElementById('tl-stats').innerHTML=`<span>TOP5: ${t5d}/${t5t}</span><span style="color:var(--line2)">|</span><span>블록: ${bld}/${blt}</span>`;
+  const dk_=dk(curDate);
+  const todayEvs=events.filter(e=>e.date===dk_);
+  const emojiChips=todayEvs.map(e=>`<span class="wk-ev-chip">${e.emoji||'🗓️'} ${e.text}</span>`).join('');
+  document.getElementById('tl-stats').innerHTML=
+    `<span>TOP5: ${t5d}/${t5t}</span><span style="color:var(--line2)">|</span><span>블록: ${bld}/${blt}</span>`
+    +(emojiChips?`<div style="margin-top:4px;line-height:1.8;">${emojiChips}</div>`:'');
 }
 
 // ── 인라인 메모 ──
