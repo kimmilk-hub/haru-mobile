@@ -449,6 +449,10 @@ textarea.inp{resize:none;line-height:1.6;}
         <div class="sec-sub">덤프나 주간 목록에서 드래그하거나 탭해서 선택</div>
         <div id="top5-list"></div>
       </div>
+      <div class="sec" id="dp-routine-sec" style="margin-top:10px;">
+        <div class="mono-label">오늘 루틴</div>
+        <div id="dp-routine-list"></div>
+      </div>
       <div class="sec" style="margin-top:10px;">
         <div class="mono-label">주간 남은 할 일</div>
         <div id="remain-list"></div>
@@ -612,6 +616,29 @@ textarea.inp{resize:none;line-height:1.6;}
           <button class="rt-dow-btn" data-dow="5" onclick="toggleDow(this)">금</button>
           <button class="rt-dow-btn" data-dow="6" onclick="toggleDow(this)">토</button>
           <button class="rt-dow-btn" data-dow="0" onclick="toggleDow(this)">일</button>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" style="display:flex;align-items:center;gap:8px;">
+        시간 <span style="font-size:10px;color:var(--gray);font-weight:400;">없으면 TOP5 아래 표시, 있으면 타임라인 자동 배치</span>
+      </label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label class="alarm-toggle">
+          <input type="checkbox" id="rt-time-on" onchange="toggleRtTimeField()">
+          <span class="alarm-slider"></span>
+        </label>
+        <span id="rt-time-label" style="font-size:12px;color:var(--gray);">시간 없음</span>
+      </div>
+      <div id="rt-time-fields" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="inp" id="rt-start" type="time" value="07:00" style="flex:1;">
+          <span style="color:var(--gray);">–</span>
+          <input class="inp" id="rt-end" type="time" value="07:30" style="flex:1;">
+        </div>
+        <div class="field" style="margin-top:8px;margin-bottom:0;">
+          <label class="field-label">색상</label>
+          <div class="color-row" id="rt-colors"></div>
         </div>
       </div>
     </div>
@@ -1177,21 +1204,37 @@ function toggleRoutine(id){
   renderRoutines();scheduleSave();
 }
 
+let rtColor=COLORS[0];
+
+function toggleRtTimeField(){
+  const on=document.getElementById('rt-time-on').checked;
+  document.getElementById('rt-time-label').textContent=on?'타임라인에 자동 배치':'시간 없음';
+  document.getElementById('rt-time-fields').style.display=on?'block':'none';
+}
+
 function openRoutineSheet(id=null){
   editRoutineId=id;
   selectedRepeat='daily';
   selectedDows=[];
+  rtColor=COLORS[0];
   document.getElementById('rt-text').value='';
   document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b.dataset.rep==='daily'));
   document.querySelectorAll('.rt-dow-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('rt-custom-days').style.display='none';
   document.getElementById('rt-del').style.display='none';
+  document.getElementById('rt-time-on').checked=false;
+  document.getElementById('rt-time-fields').style.display='none';
+  document.getElementById('rt-time-label').textContent='시간 없음';
+  document.getElementById('rt-start').value='07:00';
+  document.getElementById('rt-end').value='07:30';
+  renderColors('rt-colors',rtColor,c=>{rtColor=c;});
   if(id){
     const r=routines.find(x=>x.id===id);
     if(!r) return;
     document.getElementById('rt-text').value=r.text;
     selectedRepeat=r.repeat;
     selectedDows=r.days||[];
+    rtColor=r.color||COLORS[0];
     document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b.dataset.rep===r.repeat));
     if(r.repeat==='custom'){
       document.getElementById('rt-custom-days').style.display='block';
@@ -1199,6 +1242,14 @@ function openRoutineSheet(id=null){
         if(selectedDows.includes(parseInt(b.dataset.dow))) b.classList.add('active');
       });
     }
+    if(r.start&&r.end){
+      document.getElementById('rt-time-on').checked=true;
+      document.getElementById('rt-time-fields').style.display='block';
+      document.getElementById('rt-time-label').textContent='타임라인에 자동 배치';
+      document.getElementById('rt-start').value=r.start;
+      document.getElementById('rt-end').value=r.end;
+    }
+    renderColors('rt-colors',rtColor,c=>{rtColor=c;});
     document.getElementById('rt-del').style.display='block';
   }
   document.getElementById('routine-sheet').classList.add('show');
@@ -1220,18 +1271,25 @@ function toggleDow(btn){
 function saveRoutine(){
   const text=document.getElementById('rt-text').value.trim();
   if(!text) return;
+  const timeOn=document.getElementById('rt-time-on').checked;
+  const start=timeOn?document.getElementById('rt-start').value:null;
+  const end=timeOn?document.getElementById('rt-end').value:null;
+  const color=rtColor;
   if(editRoutineId){
     const r=routines.find(x=>x.id===editRoutineId);
-    if(r){r.text=text;r.repeat=selectedRepeat;r.days=[...selectedDows];}
+    if(r){r.text=text;r.repeat=selectedRepeat;r.days=[...selectedDows];r.start=start;r.end=end;r.color=color;}
   } else {
-    routines.push({id:uid(),text,repeat:selectedRepeat,days:[...selectedDows],done:{}});
+    routines.push({id:uid(),text,repeat:selectedRepeat,days:[...selectedDows],start,end,color,done:{}});
   }
-  closeSheet('routine-sheet');renderRoutines();scheduleSave();
+  closeSheet('routine-sheet');
+  renderRoutines();
+  renderDay(); // 일간 타임라인 즉시 반영
+  scheduleSave();
 }
 
 function deleteRoutine(){
   routines=routines.filter(r=>r.id!==editRoutineId);
-  closeSheet('routine-sheet');renderRoutines();scheduleSave();
+  closeSheet('routine-sheet');renderRoutines();renderDay();scheduleSave();
 }
 
 let wkDragId=null,wkDragText=null,wkDragFrom=null;
@@ -1269,6 +1327,7 @@ function renderWeek(){
 
   // 세로 요일 섹션
   const todayK=dk(todayD());
+  const wk=weekKey(curWeekMon);
   let html='';
   weekDays.forEach(({d,key,dow})=>{
     const tasks=wd.days[key]||[];
@@ -1276,6 +1335,15 @@ function renderWeek(){
     const dowCls=dow===0?'sun-sec':dow===6?'sat-sec':'';
     const dayEvs=events.filter(e=>e.date===key);
     const evBadges=dayEvs.map(e=>`<span class="wk-ev-badge">${e.emoji||''}${e.text}</span>`).join('');
+    // 오늘 해당 루틴
+    const dayRoutines=routines.filter(r=>isRoutineActiveToday(r,dow));
+    const routineCards=dayRoutines.map(r=>{
+      const isDone=(r.done?.[wk]?.[key])||false;
+      return `<div class="wk-routine-item" style="margin-bottom:4px;opacity:0.85;">
+        <div class="wk-routine-cb${isDone?' done':''}" onclick="toggleRoutineDay('${r.id}','${key}')">✓</div>
+        <div class="wk-routine-text${isDone?' done':''}" style="font-size:12px;">${r.text}</div>
+      </div>`;
+    }).join('');
     html+=`<div class="wk-day-section">
       <div class="wk-day-section-hd ${isT?'today-sec':''} ${dowCls}">
         <span class="wk-dow">${DOW_KO[dow]}</span>
@@ -1284,13 +1352,14 @@ function renderWeek(){
       </div>
       <div class="wk-day-section-body" data-day="${key}"
         ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,'${key}')">
+        ${routineCards}
         ${tasks.map(t=>`<div class="wk-task" draggable="true"
             data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
             <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
             <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
             <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
           </div>`).join('')}
-        ${!tasks.length?`<div class="wk-empty-label">비어있음 — 칩을 드래그하세요</div>`:''}
+        ${!tasks.length&&!dayRoutines.length?`<div class="wk-empty-label">비어있음 — 칩을 드래그하세요</div>`:''}
       </div>
     </div>`;
   });
@@ -1401,9 +1470,54 @@ let dumpDragId=null, dumpDragText=null; // 덤프→TOP5
 function renderDay(){
   renderDayDump();
   renderTop5();
+  renderDayRoutines();
   renderRemain();
   renderTimeline();
   renderTLStats();
+}
+
+function renderDayRoutines(){
+  const sec=document.getElementById('dp-routine-sec');
+  const list=document.getElementById('dp-routine-list');
+  if(!list) return;
+  const dow=curDate.getDay();
+  const dayKey=dk(curDate);
+  const wk=weekKey(curWeekMon);
+  // 시간 없는 루틴만 여기 표시 (시간 있는 건 타임라인에)
+  const todayRoutines=routines.filter(r=>isRoutineActiveToday(r,dow)&&!r.start);
+  sec.style.display=todayRoutines.length?'':'none';
+  if(!todayRoutines.length){list.innerHTML='';return;}
+  list.innerHTML=todayRoutines.map(r=>{
+    const isDone=(r.done?.[wk]?.[dayKey])||false;
+    return `<div class="wk-routine-item" style="margin-bottom:5px;cursor:grab;"
+        draggable="true"
+        data-id="rt-${r.id}" data-text="${r.text.replace(/"/g,'&quot;')}" data-from="routine">
+      <div class="wk-routine-cb${isDone?' done':''}" onclick="event.stopPropagation();toggleRoutineDay('${r.id}','${dayKey}')">✓</div>
+      <div class="wk-routine-text${isDone?' done':''}">${r.text}</div>
+      <span class="wk-routine-badge">${REPEAT_LABEL[r.repeat]||'직접'} 🔁</span>
+    </div>`;
+  }).join('');
+
+  // 드래그 → TOP5 슬롯
+  list.querySelectorAll('[draggable]').forEach(el=>{
+    el.ondragstart=e=>{
+      dumpDragId=el.dataset.id;
+      dumpDragText=el.dataset.text;
+      e.dataTransfer.effectAllowed='move';
+    };
+  });
+}
+
+function toggleRoutineDay(id, dayKey){
+  const r=routines.find(x=>x.id===id);
+  if(!r) return;
+  const wk=weekKey(curWeekMon);
+  if(!r.done) r.done={};
+  if(!r.done[wk]) r.done[wk]={};
+  r.done[wk][dayKey]=!r.done[wk][dayKey];
+  renderDayRoutines();
+  renderRoutines();
+  scheduleSave();
 }
 
 // 오늘 덤프
@@ -1625,6 +1739,19 @@ function renderTimeline(){
   const now=new Date();
   const nowTop=(now.getHours()*60+now.getMinutes()-TL_START*60)/60*TL_H;
 
+  // 오늘 루틴 중 시간 있는 것 → 가상 블록으로 합산
+  const dow=curDate.getDay();
+  const wk=weekKey(curWeekMon);
+  const dayKey=dk(curDate);
+  const routineBlocks=routines
+    .filter(r=>r.start&&r.end&&isRoutineActiveToday(r,dow))
+    .map(r=>({
+      id:'rt-'+r.id, title:r.text, start:r.start, end:r.end,
+      color:r.color||COLORS[0], done:(r.done?.[wk]?.[dayKey])||false,
+      isRoutine:true, routineId:r.id, memo:'', repeat:null
+    }));
+  const allBlocks=[...blocks,...routineBlocks];
+
   // 겹치는 블록 레이아웃
   function layout(blocks){
     const sorted=[...blocks].sort((a,b)=>t2m(a.start)-t2m(b.start));
@@ -1647,7 +1774,7 @@ function renderTimeline(){
     });
     return result;
   }
-  const laid=layout(blocks);
+  const laid=layout(allBlocks);
 
   // 라벨
   let labelsHtml='';
@@ -1675,6 +1802,19 @@ function renderTimeline(){
     const w=100/b.totalCols;
     const left=b.col*w;
     const tall=height>=38;
+    if(b.isRoutine){
+      // 루틴 블록 — 체크만, 편집 없음
+      return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);">
+        <div class="tl-block-inner" style="background:${c}10;border:1.5px dashed ${c}88;border-radius:8px;cursor:default;">
+          <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${c};border-color:${c}`:`border-color:${c}`}"
+            onclick="event.stopPropagation();toggleRoutineDay('${b.routineId}','${dayKey}')">✓</div>
+          <div class="bp-info">
+            <div class="bp-title${b.done?' done':''}" style="color:${c}">${b.title} <span style="font-size:9px;opacity:.5;">🔁</span></div>
+          </div>
+          ${tall?`<div class="bp-time" style="color:${c}">${b.start}–${b.end}</div>`:''}
+        </div>
+      </div>`;
+    }
     const memoEsc=(b.memo||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);">
       <div class="tl-block-inner" style="background:${c}18;border:1.5px solid ${c}66;border-radius:8px;" onclick="openBlockSheet('${b.id}')">
