@@ -713,32 +713,31 @@ function getMonday(d){
 function weekKey(mon){return`w-${dk(mon)}`;}
 function getWeekData(mon=curWeekMon){
   const k=weekKey(mon);
-  if(Array.isArray(weekly[k])){
-    const old=weekly[k];
-    weekly[k]={dump:[],days:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]}};
-    old.forEach(t=>weekly[k].days[4].push({id:t.id,text:t.text,done:t.done||false}));
-  }
-  if(!weekly[k])weekly[k]={dump:[],days:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]}};
+  if(!weekly[k])weekly[k]={dump:[],days:{}};
   const w=weekly[k];
   if(!w.dump)w.dump=[];
-  if(!w.days)w.days={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
-  // migrate quad format
-  if(w.quad){
-    const all=[...w.quad.q1||[],...w.quad.q2||[],...w.quad.q3||[],...w.quad.q4||[]];
-    all.forEach(t=>{
-      const dayIdx=w.days[4]||[];
-      if(!dayIdx.find(x=>x.id===t.id))dayIdx.push({id:t.id,text:t.text,done:t.done||false});
+  if(!w.days)w.days={};
+  // 구 포맷 마이그레이션 (숫자 인덱스 → 날짜 키)
+  if(w.quad||Object.keys(w.days).some(k=>!isNaN(k))){
+    const allOld=[];
+    if(w.quad){['q1','q2','q3','q4'].forEach(q=>(w.quad[q]||[]).forEach(t=>allOld.push(t)));}
+    // 숫자 키도 수집
+    Object.keys(w.days).filter(k=>!isNaN(k)).forEach(i=>{
+      (w.days[i]||[]).forEach(t=>allOld.push(t));
+      delete w.days[i];
     });
+    // 목요일(기본)에 배치
+    const thu=new Date(mon);thu.setDate(thu.getDate()+3);
+    const thuKey=dk(thu);
+    if(!w.days[thuKey])w.days[thuKey]=[];
+    allOld.forEach(t=>{if(!w.days[thuKey].find(x=>x.id===t.id))w.days[thuKey].push(t);});
     delete w.quad;
   }
-  for(let i=0;i<7;i++){if(!w.days[i])w.days[i]=[];}
   return w;
 }
 function allWeekTasks(mon=curWeekMon){
   const w=getWeekData(mon);
-  const all=[];
-  for(let i=0;i<7;i++)all.push(...(w.days[i]||[]));
-  return all;
+  return Object.values(w.days).flat();
 }
 function getDay(d=curDate){
   const k=dk(d);
@@ -1049,15 +1048,22 @@ function renderWeek(){
   document.getElementById('pb-fill').style.width=pct+'%';
   document.getElementById('pb-pct').textContent=pct+'%';
 
+  // 이 주 7일 날짜 배열 (월~일)
+  const weekDays=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(curWeekMon);
+    d.setDate(d.getDate()+i);
+    weekDays.push({d, key:dk(d), dow:d.getDay()});
+  }
+
   // 이번 주 이벤트 이모지
   const wkEvs=[];
-  for(let i=0;i<7;i++){
-    const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
-    events.filter(e=>e.date===dk(d)).forEach(e=>wkEvs.push({...e,dayLabel:DOW_KO[d.getDay()]}));
-  }
+  weekDays.forEach(({d,key,dow})=>{
+    events.filter(e=>e.date===key).forEach(e=>wkEvs.push({...e,dayLabel:DOW_KO[dow]}));
+  });
   document.getElementById('wk-ev-row').innerHTML=wkEvs.map(e=>`<span class="wk-ev-chip">${e.emoji||'🗓️'} ${e.dayLabel} ${e.text}</span>`).join('');
 
-  // 덤프 풀 (배정된 것도 표시, 흐리게)
+  // 덤프 풀
   const assignedIds=new Set(all.map(t=>t.id));
   document.getElementById('wk-pool').innerHTML=wd.dump.length
     ? wd.dump.map(c=>`<div class="chip${assignedIds.has(c.id)?' used':''}" draggable="true"
@@ -1065,38 +1071,36 @@ function renderWeek(){
         style="flex-shrink:0;">${c.text}<button class="chip-del" onclick="removeWkChip('${c.id}')">×</button></div>`).join('')
     : `<span style="font-size:11px;color:var(--gray2);">할 일을 입력하세요</span>`;
 
-  // 7열 헤더
+  // 7열 헤더 (월~일 순서)
   const todayK=dk(todayD());
   let hdrHtml='';
-  for(let i=0;i<7;i++){
-    const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
-    const key=dk(d), dow=d.getDay();
+  weekDays.forEach(({d,key,dow})=>{
     const isT=key===todayK;
-    const dayEvEmoji=events.filter(e=>e.date===key&&e.emoji).map(e=>e.emoji).join('');
     const dowCls=dow===0?'sun-hd':dow===6?'sat-hd':'';
+    const dayEvEmoji=events.filter(e=>e.date===key&&e.emoji).map(e=>e.emoji).join('');
     hdrHtml+=`<div class="wk-day-hd ${isT?'today-hd':''} ${dowCls}">
       <div class="wk-day-dow">${DOW_KO[dow]}</div>
       <div class="wk-day-num">${d.getDate()}</div>
       ${dayEvEmoji?`<div class="wk-hd-emoji">${dayEvEmoji}</div>`:''}
     </div>`;
-  }
+  });
   document.getElementById('wk-days-header').innerHTML=hdrHtml;
 
-  // 7열 본문
+  // 7열 본문 — key 기반으로 저장/조회
   let bodyHtml='';
-  for(let i=0;i<7;i++){
-    const tasks=wd.days[i]||[];
-    bodyHtml+=`<div class="wk-day-col" data-day="${i}"
-      ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,${i})">
+  weekDays.forEach(({d,key,dow},i)=>{
+    const tasks=wd.days[key]||[];
+    bodyHtml+=`<div class="wk-day-col" data-day="${key}"
+      ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,'${key}')">
       ${tasks.map(t=>`<div class="wk-task" draggable="true"
-          data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${i}" id="wktask-${t.id}">
-          <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask(${i},'${t.id}')">✓</div>
+          data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
+          <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
           <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
-          <button class="wk-task-del" onclick="removeWkTask(${i},'${t.id}')">×</button>
+          <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
         </div>`).join('')}
       ${!tasks.length?`<div class="wk-unassigned-label">드래그</div>`:''}
     </div>`;
-  }
+  });
   document.getElementById('wk-days-body').innerHTML=bodyHtml;
 
   setupWkDrag();
@@ -1119,41 +1123,39 @@ function setupWkDrag(){
 
 function wkColOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function wkColLeave(e){e.currentTarget.classList.remove('drag-over');}
-function wkColDrop(e,dayIdx){
+function wkColDrop(e,dayKey){
   e.preventDefault();e.currentTarget.classList.remove('drag-over');
   if(!wkDragId)return;
-  dropToDay(dayIdx);
+  dropToDay(dayKey);
 }
-function dropToDay(dayIdx){
+function dropToDay(dayKey){
   const wd=getWeekData();
-  const fromDay=wkDragFrom==='dump'?null:parseInt(wkDragFrom);
-  // 기존 요일에서 제거
-  if(fromDay!==null&&fromDay!==dayIdx){
-    wd.days[fromDay]=wd.days[fromDay].filter(t=>t.id!==wkDragId);
+  const fromKey=wkDragFrom==='dump'?null:wkDragFrom;
+  if(fromKey&&fromKey!==dayKey){
+    wd.days[fromKey]=(wd.days[fromKey]||[]).filter(t=>t.id!==wkDragId);
   }
-  // 이미 있으면 추가 안 함
-  if(!wd.days[dayIdx].find(t=>t.id===wkDragId)){
-    wd.days[dayIdx].push({id:wkDragId,text:wkDragText,done:false});
+  if(!wd.days[dayKey])wd.days[dayKey]=[];
+  if(!wd.days[dayKey].find(t=>t.id===wkDragId)){
+    wd.days[dayKey].push({id:wkDragId,text:wkDragText,done:false});
   }
   wkDragId=null;wkDragText=null;wkDragFrom=null;
   renderWeek();scheduleSave();
 }
-
 function removeWkChip(id){
   const wd=getWeekData();
   wd.dump=wd.dump.filter(c=>c.id!==id);
-  for(let i=0;i<7;i++)wd.days[i]=wd.days[i].filter(t=>t.id!==id);
+  Object.keys(wd.days).forEach(k=>{wd.days[k]=(wd.days[k]||[]).filter(t=>t.id!==id);});
   renderWeek();scheduleSave();
 }
-function toggleWkTask(dayIdx,id){
+function toggleWkTask(dayKey,id){
   const wd=getWeekData();
-  const t=(wd.days[dayIdx]||[]).find(x=>x.id===id);
+  const t=(wd.days[dayKey]||[]).find(x=>x.id===id);
   if(t)t.done=!t.done;
   renderWeek();scheduleSave();
 }
-function removeWkTask(dayIdx,id){
+function removeWkTask(dayKey,id){
   const wd=getWeekData();
-  wd.days[dayIdx]=(wd.days[dayIdx]||[]).filter(t=>t.id!==id);
+  wd.days[dayKey]=(wd.days[dayKey]||[]).filter(t=>t.id!==id);
   renderWeek();scheduleSave();
 }
 
@@ -1184,7 +1186,7 @@ function wkTouchMove(e){
   wkTC.style.display='none';const under=document.elementFromPoint(t.clientX,t.clientY);wkTC.style.display='';
   const col=under?.closest('.wk-day-col');
   document.querySelectorAll('.wk-day-col').forEach(c=>c.classList.remove('drag-over'));
-  wkTTargetDay=col?(col.classList.add('drag-over'),parseInt(col.dataset.day)):null;
+  wkTTargetDay=col?(col.classList.add('drag-over'),col.dataset.day):null;
 }
 function wkTouchEnd(){
   document.removeEventListener('touchmove',wkTouchMove);
