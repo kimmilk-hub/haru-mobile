@@ -1491,20 +1491,28 @@ function renderDayRoutines(){
     const isDone=(r.done?.[wk]?.[dayKey])||false;
     return `<div class="wk-routine-item" style="margin-bottom:5px;cursor:grab;"
         draggable="true"
-        data-id="rt-${r.id}" data-text="${r.text.replace(/"/g,'&quot;')}" data-from="routine">
+        data-id="rt-${r.id}" data-text="${r.text.replace(/"/g,'&quot;')}" data-from="routine" data-routine-id="${r.id}">
       <div class="wk-routine-cb${isDone?' done':''}" onclick="event.stopPropagation();toggleRoutineDay('${r.id}','${dayKey}')">✓</div>
       <div class="wk-routine-text${isDone?' done':''}">${r.text}</div>
       <span class="wk-routine-badge">${REPEAT_LABEL[r.repeat]||'직접'} 🔁</span>
     </div>`;
   }).join('');
 
-  // 드래그 → TOP5 슬롯
+  // 드래그 → 타임라인 or TOP5
   list.querySelectorAll('[draggable]').forEach(el=>{
     el.ondragstart=e=>{
-      dumpDragId=el.dataset.id;
-      dumpDragText=el.dataset.text;
+      const rid=el.dataset.routineId;
+      if(rid){
+        tlRoutineId=rid;
+        dumpDragId=null;dumpDragText=null;
+      } else {
+        dumpDragId=el.dataset.id;
+        dumpDragText=el.dataset.text;
+        tlRoutineId=null;
+      }
       e.dataTransfer.effectAllowed='move';
     };
+    el.ondragend=()=>{tlRoutineId=null;};
   });
 }
 
@@ -1698,6 +1706,8 @@ function quickAddTop5(wkId,text){
 // 타임라인
 // ════════════════════════════
 let tlDragText=null,tlDragColor=null;
+let tlRoutineId=null; // 타임라인으로 드래그 중인 루틴 id
+let tlBlockDragId=null; // 타임라인 루틴 블록 시간 조정 드래그
 let editBlockId=null,blColor=COLORS[0];
 
 // ── 카테고리 템플릿 ──
@@ -1803,9 +1813,12 @@ function renderTimeline(){
     const left=b.col*w;
     const tall=height>=38;
     if(b.isRoutine){
-      // 루틴 블록 — 체크만, 편집 없음
-      return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);">
-        <div class="tl-block-inner" style="background:${c}10;border:1.5px dashed ${c}88;border-radius:8px;cursor:default;">
+      // 루틴 블록 — 체크 + 드래그로 시간 조정
+      return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);"
+          draggable="true"
+          ondragstart="tlBlockDragId='${b.routineId}';event.dataTransfer.effectAllowed='move';"
+          ondragend="tlBlockDragId=null;">
+        <div class="tl-block-inner" style="background:${c}10;border:1.5px dashed ${c}88;border-radius:8px;cursor:grab;">
           <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${c};border-color:${c}`:`border-color:${c}`}"
             onclick="event.stopPropagation();toggleRoutineDay('${b.routineId}','${dayKey}')">✓</div>
           <div class="bp-info">
@@ -2036,12 +2049,42 @@ function toggleTL(){
 
 
 // 타임라인 드롭
-function tlOver(e){if(!tlDragText)return;e.preventDefault();e.currentTarget.classList.add('tl-over');}
+function tlOver(e){if(!tlDragText&&!tlRoutineId&&!tlBlockDragId)return;e.preventDefault();e.currentTarget.classList.add('tl-over');}
 function tlLeave(e){e.currentTarget.classList.remove('tl-over');}
 function tlDrop(e,startMin){
-  e.preventDefault();e.currentTarget.classList.remove('tl-over');
+  e.preventDefault();
+  document.querySelectorAll('.tl-drop-zone').forEach(z=>z.classList.remove('tl-over'));
+  const sMin=startMin<48?startMin*60:startMin;
+  // ① 루틴 드롭 → 루틴에 시간 저장
+  if(tlRoutineId){
+    const r=routines.find(x=>x.id===tlRoutineId);
+    if(r){
+      r.start=m2t(sMin);
+      r.end=m2t(Math.min(sMin+30,23*60+59));
+    }
+    tlRoutineId=null;
+    renderDay();renderRoutines();scheduleSave();
+    // 타임라인 열기
+    const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
+    if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
+    setTimeout(()=>{document.getElementById('tl-body').scrollTop=Math.max(0,(sMin-TL_START*60)/60*TL_H-100);},100);
+    return;
+  }
+  // ② 루틴 블록 시간 이동
+  if(tlBlockDragId){
+    const r=routines.find(x=>x.id===tlBlockDragId);
+    if(r&&r.start&&r.end){
+      const dur=t2m(r.end)-t2m(r.start);
+      r.start=m2t(sMin);
+      r.end=m2t(Math.min(sMin+dur,23*60+59));
+    }
+    tlBlockDragId=null;
+    renderDay();renderRoutines();scheduleSave();
+    return;
+  }
+  // ③ 일반 텍스트 드롭
   if(!tlDragText)return;
-  createBlock(tlDragText,tlDragColor,startMin);
+  createBlock(tlDragText,tlDragColor,sMin);
   tlDragText=null;tlDragColor=null;
 }
 function createBlock(title,color,startMin){
