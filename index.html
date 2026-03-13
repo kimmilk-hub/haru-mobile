@@ -70,6 +70,10 @@ textarea.inp{resize:none;line-height:1.6;}
 .btn-primary{flex:2;background:var(--accent);border:none;border-radius:10px;padding:12px;color:white;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-weight:500;}
 .btn-ghost{flex:1;background:var(--paper2);border:1px solid var(--line2);border-radius:10px;padding:12px;color:var(--ink2);font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
 .btn-danger{width:100%;background:none;border:1px solid var(--rose);border-radius:10px;padding:11px;color:var(--rose);font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-top:8px;}
+.rt-rep-btn{padding:5px 12px;border-radius:16px;border:1px solid var(--line2);background:var(--paper2);font-size:12px;cursor:pointer;color:var(--ink2);font-family:'Noto Sans KR',sans-serif;}
+.rt-rep-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
+.rt-dow-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);background:var(--paper2);font-size:12px;cursor:pointer;color:var(--ink2);font-family:'Noto Sans KR',sans-serif;}
+.rt-dow-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
 .color-row{display:flex;gap:8px;flex-wrap:wrap;}
 .c-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:border-color .1s;}
 .c-swatch.on{border-color:var(--ink);}
@@ -204,6 +208,19 @@ textarea.inp{resize:none;line-height:1.6;}
 .wk-dump-area{padding:10px 14px 8px;border-bottom:1px solid var(--line);}
 .wk-dump-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
 .wk-dump-scroll::-webkit-scrollbar{display:none;}
+/* ── 루틴 섹션 ── */
+.wk-routine-area{border-bottom:2px solid var(--accent);background:var(--accent2);padding:8px 14px 10px;}
+.wk-routine-hd{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.wk-routine-title{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.04em;}
+.wk-routine-add{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:2px 9px;font-size:11px;cursor:pointer;}
+.wk-routine-list{display:flex;flex-direction:column;gap:4px;}
+.wk-routine-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:white;border:1px solid var(--line);}
+.wk-routine-cb{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--accent);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent;transition:all .13s;cursor:pointer;}
+.wk-routine-cb.done{color:var(--accent);border-color:var(--accent);background:var(--accent2);}
+.wk-routine-text{flex:1;font-size:12px;color:var(--ink);}
+.wk-routine-text.done{text-decoration:line-through;color:var(--gray);}
+.wk-routine-badge{font-size:9px;padding:1px 6px;border-radius:8px;background:var(--line2);color:var(--ink2);flex-shrink:0;}
+.wk-routine-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0;}
 /* 세로 요일 섹션 */
 .wk-day-section{border-bottom:1px solid var(--line);}
 .wk-day-section-hd{
@@ -406,6 +423,13 @@ textarea.inp{resize:none;line-height:1.6;}
           <div id="wk-ev-row" style="min-height:0;margin-bottom:4px;"></div>
           <div class="wk-dump-scroll" id="wk-pool"></div>
         </div>
+        <div id="wk-routine-area" class="wk-routine-area">
+          <div class="wk-routine-hd">
+            <span class="wk-routine-title">🔁 루틴</span>
+            <button class="wk-routine-add" onclick="openRoutineSheet()">+ 추가</button>
+          </div>
+          <div class="wk-routine-list" id="wk-routine-list"></div>
+        </div>
         <div id="wk-days-body"></div>
       </div>
     </div>
@@ -565,6 +589,40 @@ textarea.inp{resize:none;line-height:1.6;}
   </div>
 </div>
 
+<!-- 시트: 루틴 -->
+<div class="sheet-bg" id="routine-sheet" onclick="bgClose(this)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="rt-sheet-title">루틴 추가</div>
+    <div class="field"><label class="field-label">내용</label><input class="inp" id="rt-text" placeholder="예: 운동 30분"></div>
+    <div class="field">
+      <label class="field-label">반복</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="rt-repeat-btns">
+        <button class="rt-rep-btn active" data-rep="daily" onclick="selectRepeat(this)">매일</button>
+        <button class="rt-rep-btn" data-rep="weekday" onclick="selectRepeat(this)">평일</button>
+        <button class="rt-rep-btn" data-rep="weekend" onclick="selectRepeat(this)">주말</button>
+        <button class="rt-rep-btn" data-rep="custom" onclick="selectRepeat(this)">직접 선택</button>
+      </div>
+      <div id="rt-custom-days" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:4px;">
+          <button class="rt-dow-btn" data-dow="1" onclick="toggleDow(this)">월</button>
+          <button class="rt-dow-btn" data-dow="2" onclick="toggleDow(this)">화</button>
+          <button class="rt-dow-btn" data-dow="3" onclick="toggleDow(this)">수</button>
+          <button class="rt-dow-btn" data-dow="4" onclick="toggleDow(this)">목</button>
+          <button class="rt-dow-btn" data-dow="5" onclick="toggleDow(this)">금</button>
+          <button class="rt-dow-btn" data-dow="6" onclick="toggleDow(this)">토</button>
+          <button class="rt-dow-btn" data-dow="0" onclick="toggleDow(this)">일</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeSheet('routine-sheet')">취소</button>
+      <button class="btn-primary" onclick="saveRoutine()">저장</button>
+    </div>
+    <button class="btn-danger" id="rt-del" style="display:none" onclick="deleteRoutine()">삭제</button>
+  </div>
+</div>
+
 <!-- 시트: 월간 프로젝트 -->
 <div class="sheet-bg" id="proj-sheet" onclick="bgClose(this)">
   <div class="sheet" onclick="event.stopPropagation()">
@@ -670,7 +728,7 @@ function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveAll,900
 async function saveAll(){
   setSyncStatus('syncing');
   try{
-    await SB.from('diary_days').upsert({date:'__haru_v3__',data:{events,projects,weekly,daily,stickers}},{onConflict:'date'});
+    await SB.from('diary_days').upsert({date:'__haru_v3__',data:{events,projects,weekly,daily,stickers,routines}},{onConflict:'date'});
     setSyncStatus('ok');
   }catch(e){setSyncStatus('err');}
 }
@@ -684,6 +742,7 @@ async function loadAll(){
       events=d.events||[]; projects=d.projects||[];
       weekly=d.weekly||{}; daily=d.daily||{};
       stickers=d.stickers||[];
+      routines=d.routines||[];
     }
     setSyncStatus('ok');
   }catch(e){setSyncStatus('err');}
@@ -1043,6 +1102,138 @@ function deleteProj(){projects=projects.filter(p=>p.id!==editProjId);closeSheet(
 // ════════════════════════════
 // 주간 — 7열 요일 레이아웃
 // ════════════════════════════
+// ════════════════════════════
+// 루틴
+// ════════════════════════════
+// routines = [{id, text, repeat:'daily'|'weekday'|'weekend'|'custom', days:[0~6], done:{weekKey:{0:bool,...}}}]
+let routines=[];
+let editRoutineId=null;
+let selectedRepeat='daily';
+let selectedDows=[];
+
+const REPEAT_LABEL={'daily':'매일','weekday':'평일','weekend':'주말','custom':'직접'};
+
+function isRoutineActiveToday(r, dow){
+  if(r.repeat==='daily') return true;
+  if(r.repeat==='weekday') return dow>=1&&dow<=5;
+  if(r.repeat==='weekend') return dow===0||dow===6;
+  if(r.repeat==='custom') return (r.days||[]).includes(dow);
+  return false;
+}
+
+function renderRoutines(){
+  const list=document.getElementById('wk-routine-list');
+  if(!list) return;
+  const todayDow=todayD().getDay();
+  const wk=weekKey(curWeekMon);
+
+  // 이번 주에 하루라도 해당되는 루틴만 표시
+  const active=routines.filter(r=>{
+    for(let i=0;i<7;i++){
+      const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
+      if(isRoutineActiveToday(r,d.getDay())) return true;
+    }
+    return false;
+  });
+
+  if(!active.length){
+    list.innerHTML=`<div style="font-size:11px;color:var(--gray2);font-style:italic;padding:2px 0;">루틴이 없어요</div>`;
+    return;
+  }
+
+  list.innerHTML=active.map(r=>{
+    const doneMap=r.done?.[wk]||{};
+    // 오늘 해당 여부
+    const todayActive=isRoutineActiveToday(r,todayDow);
+    const todayKey=dk(todayD());
+    const isDone=doneMap[todayKey]||false;
+    // 이번주 완료 현황
+    let doneCount=0,totalCount=0;
+    for(let i=0;i<7;i++){
+      const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
+      if(isRoutineActiveToday(r,d.getDay())){
+        totalCount++;
+        if(doneMap[dk(d)]) doneCount++;
+      }
+    }
+    return `<div class="wk-routine-item">
+      <div class="wk-routine-cb${isDone?' done':''}" onclick="toggleRoutine('${r.id}')">✓</div>
+      <div class="wk-routine-text${isDone?' done':''}">${r.text}</div>
+      <span class="wk-routine-badge">${REPEAT_LABEL[r.repeat]||'직접'}</span>
+      <span style="font-size:9px;color:var(--gray2);">${doneCount}/${totalCount}</span>
+      <button class="wk-routine-del" onclick="openRoutineSheet('${r.id}')">✎</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleRoutine(id){
+  const r=routines.find(x=>x.id===id);
+  if(!r) return;
+  const wk=weekKey(curWeekMon);
+  if(!r.done) r.done={};
+  if(!r.done[wk]) r.done[wk]={};
+  const todayKey=dk(todayD());
+  r.done[wk][todayKey]=!r.done[wk][todayKey];
+  renderRoutines();scheduleSave();
+}
+
+function openRoutineSheet(id=null){
+  editRoutineId=id;
+  selectedRepeat='daily';
+  selectedDows=[];
+  document.getElementById('rt-text').value='';
+  document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b.dataset.rep==='daily'));
+  document.querySelectorAll('.rt-dow-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('rt-custom-days').style.display='none';
+  document.getElementById('rt-del').style.display='none';
+  if(id){
+    const r=routines.find(x=>x.id===id);
+    if(!r) return;
+    document.getElementById('rt-text').value=r.text;
+    selectedRepeat=r.repeat;
+    selectedDows=r.days||[];
+    document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b.dataset.rep===r.repeat));
+    if(r.repeat==='custom'){
+      document.getElementById('rt-custom-days').style.display='block';
+      document.querySelectorAll('.rt-dow-btn').forEach(b=>{
+        if(selectedDows.includes(parseInt(b.dataset.dow))) b.classList.add('active');
+      });
+    }
+    document.getElementById('rt-del').style.display='block';
+  }
+  document.getElementById('routine-sheet').classList.add('show');
+}
+
+function selectRepeat(btn){
+  selectedRepeat=btn.dataset.rep;
+  document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b===btn));
+  document.getElementById('rt-custom-days').style.display=selectedRepeat==='custom'?'block':'none';
+}
+
+function toggleDow(btn){
+  const dow=parseInt(btn.dataset.dow);
+  btn.classList.toggle('active');
+  if(selectedDows.includes(dow)) selectedDows=selectedDows.filter(d=>d!==dow);
+  else selectedDows.push(dow);
+}
+
+function saveRoutine(){
+  const text=document.getElementById('rt-text').value.trim();
+  if(!text) return;
+  if(editRoutineId){
+    const r=routines.find(x=>x.id===editRoutineId);
+    if(r){r.text=text;r.repeat=selectedRepeat;r.days=[...selectedDows];}
+  } else {
+    routines.push({id:uid(),text,repeat:selectedRepeat,days:[...selectedDows],done:{}});
+  }
+  closeSheet('routine-sheet');renderRoutines();scheduleSave();
+}
+
+function deleteRoutine(){
+  routines=routines.filter(r=>r.id!==editRoutineId);
+  closeSheet('routine-sheet');renderRoutines();scheduleSave();
+}
+
 let wkDragId=null,wkDragText=null,wkDragFrom=null;
 const DOW_KO=['일','월','화','수','목','금','토'];
 
@@ -1105,6 +1296,7 @@ function renderWeek(){
   });
   document.getElementById('wk-days-body').innerHTML=html;
 
+  renderRoutines();
   setupWkDrag();
 }
 
