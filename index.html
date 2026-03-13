@@ -204,27 +204,34 @@ textarea.inp{resize:none;line-height:1.6;}
 .wk-dump-area{padding:10px 14px 8px;border-bottom:1px solid var(--line);}
 .wk-dump-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
 .wk-dump-scroll::-webkit-scrollbar{display:none;}
-.wk-days-header{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:10;}
-.wk-day-hd{text-align:center;padding:6px 2px 4px;font-size:10px;font-weight:600;color:var(--ink2);border-right:1px solid var(--line);}
-.wk-day-hd:last-child{border-right:none;}
-.wk-day-hd.today-hd .wk-day-num{background:var(--accent);color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
-.wk-day-hd .wk-day-dow{font-size:9px;color:var(--gray);margin-bottom:2px;}
-.wk-day-hd .wk-day-num{font-size:12px;font-weight:700;color:var(--ink);line-height:20px;}
-.wk-day-hd.sun-hd .wk-day-num{color:#c04030;}
-.wk-day-hd.sat-hd .wk-day-num{color:#3a6090;}
-.wk-day-hd .wk-hd-emoji{font-size:10px;line-height:1;margin-top:1px;}
-.wk-days-body{display:grid;grid-template-columns:repeat(7,1fr);min-height:200px;align-items:start;}
-.wk-day-col{border-right:1px solid var(--line);min-height:200px;padding:4px 3px;transition:background .15s;}
-.wk-day-col:last-child{border-right:none;}
-.wk-day-col.drag-over{background:var(--accent2);outline:2px dashed var(--accent);outline-offset:-2px;border-radius:4px;}
-.wk-task{display:flex;align-items:flex-start;gap:3px;padding:4px 5px;border-radius:6px;margin-bottom:3px;background:white;border:1px solid var(--line);cursor:grab;touch-action:none;font-size:11px;line-height:1.35;}
+/* 세로 요일 섹션 */
+.wk-day-section{border-bottom:1px solid var(--line);}
+.wk-day-section-hd{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px 6px;
+  position:sticky;top:0;background:var(--paper);z-index:5;
+  border-bottom:1px solid var(--line2);
+}
+.wk-day-section-hd .wk-dow{font-size:11px;font-weight:700;color:var(--ink2);width:18px;}
+.wk-day-section-hd .wk-dnum{
+  font-size:20px;font-weight:800;color:var(--ink);
+  font-family:'DM Mono',monospace;line-height:1;width:28px;text-align:center;
+}
+.wk-day-section-hd.today-sec .wk-dnum{color:var(--accent);}
+.wk-day-section-hd.sun-sec .wk-dnum{color:#c04030;}
+.wk-day-section-hd.sat-sec .wk-dnum{color:#3a6090;}
+.wk-day-section-hd .wk-sec-evs{flex:1;display:flex;flex-wrap:wrap;gap:4px;}
+.wk-day-section-hd .wk-ev-badge{font-size:10px;background:var(--gold2);color:#7a5a00;border-radius:8px;padding:1px 7px;}
+.wk-day-section-body{padding:6px 14px 8px;min-height:36px;}
+.wk-day-section-body.drag-over{background:var(--accent2);outline:2px dashed var(--accent);outline-offset:-4px;border-radius:6px;}
+.wk-task{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;margin-bottom:5px;background:var(--paper2);border:1px solid var(--line);cursor:grab;touch-action:none;font-size:13px;line-height:1.4;}
 .wk-task.dragging{opacity:.3;}
-.wk-task-cb{width:13px;height:13px;border-radius:3px;border:1.5px solid var(--line2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:8px;color:transparent;transition:all .13s;cursor:pointer;}
+.wk-task-cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--line2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;transition:all .13s;cursor:pointer;}
 .wk-task-cb.done{color:white;background:var(--accent);border-color:var(--accent);}
-.wk-task-text{flex:1;color:var(--ink);word-break:break-all;}
+.wk-task-text{flex:1;color:var(--ink);}
 .wk-task-text.done{text-decoration:line-through;color:var(--gray);}
-.wk-task-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:11px;padding:0;flex-shrink:0;line-height:1;}
-.wk-unassigned-label{font-size:9px;color:var(--gray2);text-align:center;padding:8px 0;font-style:italic;}
+.wk-task-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;line-height:1;}
+.wk-empty-label{font-size:11px;color:var(--gray2);padding:4px 0;font-style:italic;}
 
 
 /* ── 연간 ── */
@@ -399,8 +406,7 @@ textarea.inp{resize:none;line-height:1.6;}
           <div id="wk-ev-row" style="min-height:0;margin-bottom:4px;"></div>
           <div class="wk-dump-scroll" id="wk-pool"></div>
         </div>
-        <div class="wk-days-header" id="wk-days-header"></div>
-        <div class="wk-days-body" id="wk-days-body"></div>
+        <div id="wk-days-body"></div>
       </div>
     </div>
 
@@ -1048,15 +1054,14 @@ function renderWeek(){
   document.getElementById('pb-fill').style.width=pct+'%';
   document.getElementById('pb-pct').textContent=pct+'%';
 
-  // 이 주 7일 날짜 배열 (월~일)
+  // 이 주 7일 (월~일)
   const weekDays=[];
   for(let i=0;i<7;i++){
-    const d=new Date(curWeekMon);
-    d.setDate(d.getDate()+i);
-    weekDays.push({d, key:dk(d), dow:d.getDay()});
+    const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
+    weekDays.push({d,key:dk(d),dow:d.getDay()});
   }
 
-  // 이번 주 이벤트 이모지
+  // 이번 주 이벤트 (ev-row 칩)
   const wkEvs=[];
   weekDays.forEach(({d,key,dow})=>{
     events.filter(e=>e.date===key).forEach(e=>wkEvs.push({...e,dayLabel:DOW_KO[dow]}));
@@ -1071,37 +1076,34 @@ function renderWeek(){
         style="flex-shrink:0;">${c.text}<button class="chip-del" onclick="removeWkChip('${c.id}')">×</button></div>`).join('')
     : `<span style="font-size:11px;color:var(--gray2);">할 일을 입력하세요</span>`;
 
-  // 7열 헤더 (월~일 순서)
+  // 세로 요일 섹션
   const todayK=dk(todayD());
-  let hdrHtml='';
+  let html='';
   weekDays.forEach(({d,key,dow})=>{
-    const isT=key===todayK;
-    const dowCls=dow===0?'sun-hd':dow===6?'sat-hd':'';
-    const dayEvEmoji=events.filter(e=>e.date===key&&e.emoji).map(e=>e.emoji).join('');
-    hdrHtml+=`<div class="wk-day-hd ${isT?'today-hd':''} ${dowCls}">
-      <div class="wk-day-dow">${DOW_KO[dow]}</div>
-      <div class="wk-day-num">${d.getDate()}</div>
-      ${dayEvEmoji?`<div class="wk-hd-emoji">${dayEvEmoji}</div>`:''}
-    </div>`;
-  });
-  document.getElementById('wk-days-header').innerHTML=hdrHtml;
-
-  // 7열 본문 — key 기반으로 저장/조회
-  let bodyHtml='';
-  weekDays.forEach(({d,key,dow},i)=>{
     const tasks=wd.days[key]||[];
-    bodyHtml+=`<div class="wk-day-col" data-day="${key}"
-      ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,'${key}')">
-      ${tasks.map(t=>`<div class="wk-task" draggable="true"
-          data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
-          <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
-          <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
-          <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
-        </div>`).join('')}
-      ${!tasks.length?`<div class="wk-unassigned-label">드래그</div>`:''}
+    const isT=key===todayK;
+    const dowCls=dow===0?'sun-sec':dow===6?'sat-sec':'';
+    const dayEvs=events.filter(e=>e.date===key);
+    const evBadges=dayEvs.map(e=>`<span class="wk-ev-badge">${e.emoji||''}${e.text}</span>`).join('');
+    html+=`<div class="wk-day-section">
+      <div class="wk-day-section-hd ${isT?'today-sec':''} ${dowCls}">
+        <span class="wk-dow">${DOW_KO[dow]}</span>
+        <span class="wk-dnum">${d.getDate()}</span>
+        <div class="wk-sec-evs">${evBadges}</div>
+      </div>
+      <div class="wk-day-section-body" data-day="${key}"
+        ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,'${key}')">
+        ${tasks.map(t=>`<div class="wk-task" draggable="true"
+            data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
+            <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
+            <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
+            <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
+          </div>`).join('')}
+        ${!tasks.length?`<div class="wk-empty-label">비어있음 — 칩을 드래그하세요</div>`:''}
+      </div>
     </div>`;
   });
-  document.getElementById('wk-days-body').innerHTML=bodyHtml;
+  document.getElementById('wk-days-body').innerHTML=html;
 
   setupWkDrag();
 }
@@ -1184,15 +1186,15 @@ function wkTouchMove(e){
   const t=e.touches[0];
   wkTC.style.left=(t.clientX-60)+'px';wkTC.style.top=(t.clientY-18)+'px';
   wkTC.style.display='none';const under=document.elementFromPoint(t.clientX,t.clientY);wkTC.style.display='';
-  const col=under?.closest('.wk-day-col');
-  document.querySelectorAll('.wk-day-col').forEach(c=>c.classList.remove('drag-over'));
+  const col=under?.closest('.wk-day-section-body');
+  document.querySelectorAll('.wk-day-section-body').forEach(c=>c.classList.remove('drag-over'));
   wkTTargetDay=col?(col.classList.add('drag-over'),col.dataset.day):null;
 }
 function wkTouchEnd(){
   document.removeEventListener('touchmove',wkTouchMove);
   if(wkTC){wkTC.remove();wkTC=null;}
   if(wkTSrc){wkTSrc.classList.remove('dragging');wkTSrc=null;}
-  document.querySelectorAll('.wk-day-col').forEach(c=>c.classList.remove('drag-over'));
+  document.querySelectorAll('.wk-day-section-body').forEach(c=>c.classList.remove('drag-over'));
   if(wkTTargetDay!==null&&wkDragId)dropToDay(wkTTargetDay);
   wkTTargetDay=null;wkDragId=null;wkDragText=null;wkDragFrom=null;
 }
