@@ -645,10 +645,8 @@ body.tl-dragging .tl-drop-zone{pointer-events:auto;}
         </div>
       </div>
     </div>
+    <div class="field"><label class="field-label">메모</label><textarea class="inp" id="rt-memo" rows="2" placeholder="메모…" style="resize:none;"></textarea></div>
     <div class="btn-row">
-      <button class="btn-ghost" onclick="closeSheet('routine-sheet')">취소</button>
-      <button class="btn-primary" onclick="saveRoutine()">저장</button>
-    </div>
     <button class="btn-danger" id="rt-del" style="display:none" onclick="deleteRoutine()">삭제</button>
   </div>
 </div>
@@ -1231,6 +1229,7 @@ function openRoutineSheet(id=null){
   selectedDows=[];
   rtColor=COLORS[0];
   document.getElementById('rt-text').value='';
+  document.getElementById('rt-memo').value='';
   document.querySelectorAll('.rt-rep-btn').forEach(b=>b.classList.toggle('active',b.dataset.rep==='daily'));
   document.querySelectorAll('.rt-dow-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('rt-custom-days').style.display='none';
@@ -1245,6 +1244,7 @@ function openRoutineSheet(id=null){
     const r=routines.find(x=>x.id===id);
     if(!r) return;
     document.getElementById('rt-text').value=r.text;
+    document.getElementById('rt-memo').value=r.memo||'';
     selectedRepeat=r.repeat;
     selectedDows=r.days||[];
     rtColor=r.color||COLORS[0];
@@ -1288,15 +1288,23 @@ function saveRoutine(){
   const start=timeOn?document.getElementById('rt-start').value:null;
   const end=timeOn?document.getElementById('rt-end').value:null;
   const color=rtColor;
+  const memo=document.getElementById('rt-memo').value;
   if(editRoutineId){
     const r=routines.find(x=>x.id===editRoutineId);
-    if(r){r.text=text;r.repeat=selectedRepeat;r.days=[...selectedDows];r.start=start;r.end=end;r.color=color;}
+    if(r){r.text=text;r.repeat=selectedRepeat;r.days=[...selectedDows];r.start=start;r.end=end;r.color=color;r.memo=memo;}
   } else {
-    routines.push({id:uid(),text,repeat:selectedRepeat,days:[...selectedDows],start,end,color,done:{}});
+    routines.push({id:uid(),text,repeat:selectedRepeat,days:[...selectedDows],start,end,color,memo,done:{}});
   }
   closeSheet('routine-sheet');
   renderRoutines();
   renderDay(); // 일간 타임라인 즉시 반영
+  scheduleSave();
+}
+
+function saveRoutineMemo(ta){
+  const rid=ta.dataset.routineId;
+  const r=routines.find(x=>x.id===rid);
+  if(r){r.memo=ta.value;}
   scheduleSave();
 }
 
@@ -1803,7 +1811,7 @@ function renderTimeline(){
     .map(r=>({
       id:'rt-'+r.id, title:r.text, start:r.start, end:r.end,
       color:r.color||COLORS[0], done:(r.done?.[wk]?.[dayKey])||false,
-      isRoutine:true, routineId:r.id, memo:'', repeat:null
+      isRoutine:true, routineId:r.id, memo:r.memo||'', repeat:null
     }));
   const allBlocks=[...blocks,...routineBlocks];
 
@@ -1858,12 +1866,13 @@ function renderTimeline(){
     const left=b.col*w;
     const tall=height>=38;
     if(b.isRoutine){
-      // 루틴 블록 — 체크 + 드래그로 시간 조정
+      const memoEsc=(b.memo||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);"
           draggable="true"
           ondragstart="tlBlockDragId='${b.routineId}';document.body.classList.add('tl-dragging');event.dataTransfer.effectAllowed='move';"
           ondragend="tlBlockDragId=null;document.body.classList.remove('tl-dragging');">
-        <div class="tl-block-inner" style="background:${c}10;border:1.5px dashed ${c}88;border-radius:8px;cursor:grab;">
+        <div class="tl-block-inner" style="background:${c}10;border:1.5px dashed ${c}88;border-radius:8px;cursor:pointer;"
+            onclick="openRoutineSheet('${b.routineId}')">
           <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${c};border-color:${c}`:`border-color:${c}`}"
             onclick="event.stopPropagation();toggleRoutineDay('${b.routineId}','${dayKey}')">✓</div>
           <div class="bp-info">
@@ -1871,6 +1880,11 @@ function renderTimeline(){
           </div>
           ${tall?`<div class="bp-time" style="color:${c}">${b.start}–${b.end}</div>`:''}
         </div>
+        <textarea class="block-memo-input" placeholder="메모…" data-routine-id="${b.routineId}"
+          style="background:${c}0d;color:${c};${height<50?'display:none;':''}"
+          onclick="event.stopPropagation()"
+          onchange="saveRoutineMemo(this)"
+          oninput="autoResizeMemo(this)">${memoEsc}</textarea>
       </div>`;
     }
     const memoEsc=(b.memo||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
