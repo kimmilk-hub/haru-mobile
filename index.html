@@ -248,6 +248,8 @@ textarea.inp{resize:none;line-height:1.6;}
 .wk-task-text{flex:1;color:var(--ink);}
 .wk-task-text.done{text-decoration:line-through;color:var(--gray);}
 .wk-task-del{background:none;border:none;color:var(--gray2);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;line-height:1;}
+.wk-task-tl{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0;line-height:1;opacity:.7;}
+.chip-tl{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:0 2px;line-height:1;opacity:.7;flex-shrink:0;}
 .wk-empty-label{font-size:11px;color:var(--gray2);padding:4px 0;font-style:italic;}
 
 
@@ -1354,6 +1356,14 @@ function renderWeek(){
         <div class="wk-routine-text${isDone?' done':''}" style="font-size:12px;">${r.text}</div>
       </div>`;
     }).join('');
+    // 오늘 카드에만 타임라인 바로가기 버튼
+    const taskCards=tasks.map(t=>`<div class="wk-task" draggable="true"
+        data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
+        <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
+        <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
+        ${isT?`<button class="wk-task-tl" title="타임라인에 추가" data-text="${t.text.replace(/"/g,'&quot;')}" onclick="addWkTaskToTL(this.dataset.text)">⏱</button>`:''}
+        <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
+      </div>`).join('');
     html+=`<div class="wk-day-section">
       <div class="wk-day-section-hd ${isT?'today-sec':''} ${dowCls}">
         <span class="wk-dow">${DOW_KO[dow]}</span>
@@ -1363,12 +1373,7 @@ function renderWeek(){
       <div class="wk-day-section-body" data-day="${key}"
         ondragover="wkColOver(event)" ondragleave="wkColLeave(event)" ondrop="wkColDrop(event,'${key}')">
         ${routineCards}
-        ${tasks.map(t=>`<div class="wk-task" draggable="true"
-            data-id="${t.id}" data-text="${t.text.replace(/"/g,'&quot;')}" data-from="${key}" id="wktask-${t.id}">
-            <div class="wk-task-cb${t.done?' done':''}" onclick="toggleWkTask('${key}','${t.id}')">✓</div>
-            <div class="wk-task-text${t.done?' done':''}">${t.text}</div>
-            <button class="wk-task-del" onclick="removeWkTask('${key}','${t.id}')">×</button>
-          </div>`).join('')}
+        ${taskCards}
         ${!tasks.length&&!dayRoutines.length?`<div class="wk-empty-label">비어있음 — 칩을 드래그하세요</div>`:''}
       </div>
     </div>`;
@@ -1382,18 +1387,37 @@ function renderWeek(){
 function setupWkDrag(){
   // 덤프 칩 드래그
   document.querySelectorAll('#wk-pool .chip[draggable]').forEach(el=>{
-    el.ondragstart=e=>{wkDragId=el.dataset.id;wkDragText=el.dataset.text;wkDragFrom='dump';el.classList.add('dragging');e.dataTransfer.effectAllowed='move';};
-    el.ondragend=()=>el.classList.remove('dragging');
+    el.ondragstart=e=>{
+      wkDragId=el.dataset.id;wkDragText=el.dataset.text;wkDragFrom='dump';
+      tlDragText=el.dataset.text;tlDragColor=COLORS[0];
+      el.classList.add('dragging');e.dataTransfer.effectAllowed='move';
+    };
+    el.ondragend=()=>{el.classList.remove('dragging');tlDragText=null;tlDragColor=null;};
     el.ontouchstart=e=>wkTouchStart(e,el);
   });
-  // 요일 카드 드래그
+  // 요일 카드 드래그 — 주간 내 이동 + 타임라인 드롭 둘 다 지원
   document.querySelectorAll('.wk-task[draggable]').forEach(el=>{
-    el.ondragstart=e=>{wkDragId=el.dataset.id;wkDragText=el.dataset.text;wkDragFrom=el.dataset.from;el.classList.add('dragging');e.dataTransfer.effectAllowed='move';};
-    el.ondragend=()=>el.classList.remove('dragging');
+    el.ondragstart=e=>{
+      wkDragId=el.dataset.id;wkDragText=el.dataset.text;wkDragFrom=el.dataset.from;
+      tlDragText=el.dataset.text;tlDragColor=COLORS[0];
+      el.classList.add('dragging');e.dataTransfer.effectAllowed='move';
+      // 일간 탭이면 타임라인 자동 오픈
+      if(curTab===4){
+        const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
+        if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
+      }
+    };
+    el.ondragend=()=>{el.classList.remove('dragging');tlDragText=null;tlDragColor=null;wkDragId=null;};
     el.ontouchstart=e=>wkTouchStart(e,el);
   });
 }
 
+function addWkTaskToTL(text){
+  const now=new Date();
+  const sMin=(now.getHours()+1)*60;
+  createBlock(text, COLORS[0], sMin);
+  switchTab(4);
+}
 function wkColOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function wkColLeave(e){e.currentTarget.classList.remove('drag-over');}
 function wkColDrop(e,dayKey){
@@ -1555,15 +1579,19 @@ function renderDayDump(){
   const day=getDay();
   const usedIds=new Set(day.top5.filter(Boolean).map(t=>t.dumpId).filter(Boolean));
   document.getElementById('day-pool').innerHTML=day.dump.length
-    ? day.dump.map(c=>`<div class="chip${usedIds.has(c.id)?' used':''}" draggable="true" data-id="${c.id}" data-text="${c.text.replace(/"/g,'&quot;')}" id="daychip-${c.id}">${c.text}<button class="chip-del" onclick="removeDayDump('${c.id}')">×</button></div>`).join('')
+    ? day.dump.map(c=>`<div class="chip${usedIds.has(c.id)?' used':''}" draggable="true" data-id="${c.id}" data-text="${c.text.replace(/"/g,'&quot;')}" id="daychip-${c.id}">${c.text}<button class="chip-tl" title="타임라인에 추가" onclick="event.stopPropagation();addWkTaskToTL('${c.text.replace(/'/g,"\\'")}')">⏱</button><button class="chip-del" onclick="removeDayDump('${c.id}')">×</button></div>`).join('')
     : `<div style="font-size:11px;color:var(--gray2);">오늘 새로 생긴 할 일을 입력하세요</div>`;
-  // 덤프→TOP5 드래그
+  // 덤프→TOP5 or 타임라인 드래그
   document.querySelectorAll('#day-pool .chip[draggable]').forEach(el=>{
     el.ondragstart=e=>{
       dumpDragId=el.dataset.id;dumpDragText=el.dataset.text;
+      tlDragText=el.dataset.text;tlDragColor=COLORS[0];
       el.classList.add('dragging');e.dataTransfer.effectAllowed='copy';
+      // 타임라인 자동 오픈
+      const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
+      if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
     };
-    el.ondragend=()=>{el.classList.remove('dragging');dumpDragId=null;dumpDragText=null;};
+    el.ondragend=()=>{el.classList.remove('dragging');dumpDragId=null;dumpDragText=null;tlDragText=null;tlDragColor=null;};
     el.ontouchstart=e=>dumpTouchStart(e,el);
   });
 }
