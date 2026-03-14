@@ -851,10 +851,20 @@ function switchTab(n){
   document.getElementById('fab').classList.toggle('show',n===4);
   updateHeader();
   if(n===1)renderYear();
-  else if(n===2)renderMonth();
-  else if(n===3)renderWeek();
+  else if(n===2){renderMonth();setTimeout(scrollToTodayMonth,80);}
+  else if(n===3){renderWeek();setTimeout(scrollToToday,80);}
   else if(n===4)renderDay();
   else if(n===5)renderReview();
+}
+
+function scrollToToday(){
+  const sec=document.querySelector(`.wk-day-section-hd.today-sec`);
+  if(sec){sec.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+
+function scrollToTodayMonth(){
+  const todayCell=document.querySelector('.mc.today');
+  if(todayCell){todayCell.scrollIntoView({behavior:'smooth',block:'center'});}
 }
 
 function updateHeader(){
@@ -871,13 +881,13 @@ function updateHeader(){
     label.textContent=`${curYear}.${p2(curMonth+1)}`;
     prev.onclick=()=>{curMonth--;if(curMonth<0){curMonth=11;curYear--;}renderMonth();label.textContent=`${curYear}.${p2(curMonth+1)}`;};
     next.onclick=()=>{curMonth++;if(curMonth>11){curMonth=0;curYear++;}renderMonth();label.textContent=`${curYear}.${p2(curMonth+1)}`;};
-    today.onclick=()=>{const t=new Date();curYear=t.getFullYear();curMonth=t.getMonth();renderMonth();label.textContent=`${curYear}.${p2(curMonth+1)}`;};
+    today.onclick=()=>{const t=new Date();curYear=t.getFullYear();curMonth=t.getMonth();renderMonth();label.textContent=`${curYear}.${p2(curMonth+1)}`;scrollToTodayMonth();};
   } else if(curTab===3){
     const days=Array.from({length:7},(_,i)=>{const d=new Date(curWeekMon);d.setDate(curWeekMon.getDate()+i);return d;});
     label.textContent=`${days[0].getMonth()+1}/${days[0].getDate()}–${days[6].getMonth()+1}/${days[6].getDate()}`;
     prev.onclick=()=>{curWeekMon=new Date(curWeekMon);curWeekMon.setDate(curWeekMon.getDate()-7);renderWeek();updateHeader();};
     next.onclick=()=>{curWeekMon=new Date(curWeekMon);curWeekMon.setDate(curWeekMon.getDate()+7);renderWeek();updateHeader();};
-    today.onclick=()=>{curWeekMon=getMonday(todayD());renderWeek();updateHeader();};
+    today.onclick=()=>{curWeekMon=getMonday(todayD());renderWeek();updateHeader();scrollToToday();};
   } else {
     const isToday=dk(curDate)===dk(todayD());
     label.textContent=`${curDate.getMonth()+1}/${curDate.getDate()} (${KO_DAYS[curDate.getDay()]})${isToday?' · 오늘':''}`;
@@ -1505,6 +1515,10 @@ function renderDayRoutines(){
       if(rid){
         tlRoutineId=rid;
         dumpDragId=null;dumpDragText=null;
+        // 타임라인 자동 오픈
+        const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
+        if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
+        setTimeout(()=>{body.scrollIntoView({behavior:'smooth',block:'start'});},100);
       } else {
         dumpDragId=el.dataset.id;
         dumpDragText=el.dataset.text;
