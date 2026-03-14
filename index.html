@@ -647,6 +647,9 @@ body.tl-dragging .tl-drop-zone{pointer-events:auto;}
     </div>
     <div class="field"><label class="field-label">메모</label><textarea class="inp" id="rt-memo" rows="2" placeholder="메모…" style="resize:none;"></textarea></div>
     <div class="btn-row">
+      <button class="btn-ghost" onclick="closeSheet('routine-sheet')">취소</button>
+      <button class="btn-primary" onclick="saveRoutine()">저장</button>
+    </div>
     <button class="btn-danger" id="rt-del" style="display:none" onclick="deleteRoutine()">삭제</button>
   </div>
 </div>
@@ -2113,6 +2116,7 @@ function tlLeave(e){e.currentTarget.classList.remove('tl-over');}
 function tlDrop(e,startMin){
   e.preventDefault();
   document.querySelectorAll('.tl-drop-zone').forEach(z=>z.classList.remove('tl-over'));
+  document.body.classList.remove('tl-dragging'); // 항상 제거
   const sMin=startMin<48?startMin*60:startMin;
   // ① 루틴 드롭 → 루틴에 시간 저장
   if(tlRoutineId){
