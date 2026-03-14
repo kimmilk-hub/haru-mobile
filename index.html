@@ -1549,21 +1549,23 @@ function renderDayRoutines(){
   list.querySelectorAll('[draggable]').forEach(el=>{
     el.ondragstart=e=>{
       const rid=el.dataset.routineId;
-      if(rid){
-        tlRoutineId=rid;
-        dumpDragId=null;dumpDragText=null;
-        const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
-        if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
-        setTimeout(()=>{body.scrollIntoView({behavior:'smooth',block:'start'});},100);
-      } else {
-        dumpDragId=el.dataset.id;
-        dumpDragText=el.dataset.text;
-        tlRoutineId=null;
-      }
+      // 타임라인 드롭용
+      tlRoutineId=rid||null;
+      // TOP5 드롭용 — 루틴도 dumpDragId/Text 세팅
+      dumpDragId=el.dataset.id;
+      dumpDragText=el.dataset.text;
       document.body.classList.add('tl-dragging');
       e.dataTransfer.effectAllowed='move';
+      if(rid){
+        const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
+        if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
+      }
     };
-    el.ondragend=()=>{tlRoutineId=null;document.body.classList.remove('tl-dragging');};
+    el.ondragend=()=>{
+      tlRoutineId=null;
+      dumpDragId=null;dumpDragText=null;
+      document.body.classList.remove('tl-dragging');
+    };
   });
 }
 
@@ -1659,7 +1661,9 @@ function t5Over(e,i){e.preventDefault();e.currentTarget.classList.add('drag-over
 function t5Leave(e){e.currentTarget.classList.remove('drag-over');}
 function t5Drop(e,targetIdx){
   e.preventDefault();e.currentTarget.classList.remove('drag-over');
-  // 덤프에서 왔을 때
+  document.body.classList.remove('tl-dragging');
+  tlRoutineId=null; // 루틴이 TOP5에 드롭될 때 타임라인 드롭 방지
+  // 덤프 또는 루틴에서 왔을 때
   if(dumpDragId){
     addToTop5Slot(targetIdx,dumpDragId,dumpDragText);
     return;
