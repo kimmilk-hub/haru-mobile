@@ -1187,10 +1187,9 @@ function isRoutineActiveToday(r, dow){
 function renderRoutines(){
   const list=document.getElementById('wk-routine-list');
   if(!list) return;
-  const todayDow=todayD().getDay();
   const wk=weekKey(curWeekMon);
+  const todayK=dk(todayD());
 
-  // 이번 주에 하루라도 해당되는 루틴만 표시
   const active=routines.filter(r=>{
     for(let i=0;i<7;i++){
       const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
@@ -1206,24 +1205,28 @@ function renderRoutines(){
 
   list.innerHTML=active.map(r=>{
     const doneMap=r.done?.[wk]||{};
-    // 오늘 해당 여부
-    const todayActive=isRoutineActiveToday(r,todayDow);
-    const todayKey=dk(todayD());
-    const isDone=doneMap[todayKey]||false;
-    // 이번주 완료 현황
+    // 이번 주 완료 현황
     let doneCount=0,totalCount=0;
+    let weekDots='';
     for(let i=0;i<7;i++){
       const d=new Date(curWeekMon);d.setDate(d.getDate()+i);
+      const key=dk(d);
       if(isRoutineActiveToday(r,d.getDay())){
         totalCount++;
-        if(doneMap[dk(d)]) doneCount++;
+        const done=doneMap[key]||false;
+        if(done) doneCount++;
+        weekDots+=`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 1px;background:${done?'var(--accent)':'var(--line2)'};${key===todayK?'outline:1.5px solid var(--accent);outline-offset:1px;':''}"></span>`;
+      } else {
+        weekDots+=`<span style="display:inline-block;width:7px;height:7px;margin:0 1px;"></span>`;
       }
     }
+    // 오늘 완료 여부 (토글용)
+    const todayDone=doneMap[todayK]||false;
     return `<div class="wk-routine-item">
-      <div class="wk-routine-cb${isDone?' done':''}" onclick="toggleRoutine('${r.id}')">✓</div>
-      <div class="wk-routine-text${isDone?' done':''}">${r.text}</div>
-      <span class="wk-routine-badge">${REPEAT_LABEL[r.repeat]||'직접'}</span>
-      <span style="font-size:9px;color:var(--gray2);">${doneCount}/${totalCount}</span>
+      <div class="wk-routine-cb${todayDone?' done':''}" onclick="toggleRoutine('${r.id}')">✓</div>
+      <div class="wk-routine-text${todayDone?' done':''}">${r.text}</div>
+      <div style="display:flex;align-items:center;gap:2px;margin-left:auto;">${weekDots}</div>
+      <span style="font-size:9px;color:var(--gray2);margin-left:4px;">${doneCount}/${totalCount}</span>
       <button class="wk-routine-del" onclick="openRoutineSheet('${r.id}')">✎</button>
     </div>`;
   }).join('');
@@ -1790,6 +1793,75 @@ function quickAddTop5(wkId,text){
 let tlDragText=null,tlDragColor=null;
 let tlRoutineId=null; // 타임라인으로 드래그 중인 루틴 id
 let tlBlockDragId=null; // 타임라인 루틴 블록 시간 조정 드래그
+let tlMoveId=null;     // 일반 블록 이동 드래그
+let tlResizeId=null, tlResizeStartY=0, tlResizeStartEnd=0; // 리사이즈
+
+function tlMoveStart(e, blockId){
+  tlMoveId=blockId;
+  tlDragText=null; // 텍스트 드롭 방지
+  e.dataTransfer.effectAllowed='move';
+}
+function tlMoveEnd(){ tlMoveId=null; }
+
+// 리사이즈 — 마우스
+function tlResizeStart(e, blockId){
+  e.preventDefault();e.stopPropagation();
+  const day=getDay();
+  const b=day.blocks.find(x=>x.id===blockId);
+  if(!b)return;
+  tlResizeId=blockId;
+  tlResizeStartY=e.clientY;
+  tlResizeStartEnd=t2m(b.end);
+  document.addEventListener('mousemove',tlResizeMove);
+  document.addEventListener('mouseup',tlResizeUp,{once:true});
+}
+function tlResizeMove(e){
+  if(!tlResizeId)return;
+  const dy=e.clientY-tlResizeStartY;
+  const dMin=Math.round(dy/TL_H*60/15)*15; // 15분 단위
+  const day=getDay();
+  const b=day.blocks.find(x=>x.id===tlResizeId);
+  if(!b)return;
+  const sMin=t2m(b.start);
+  const newEnd=Math.max(sMin+15, Math.min(tlResizeStartEnd+dMin, 23*60+45));
+  b.end=m2t(newEnd);
+  renderTimeline();renderTLStats();
+}
+function tlResizeUp(){
+  tlResizeId=null;
+  scheduleSave();
+}
+
+// 리사이즈 — 터치
+function tlResizeTouchStart(e, blockId){
+  e.preventDefault();e.stopPropagation();
+  const day=getDay();
+  const b=day.blocks.find(x=>x.id===blockId);
+  if(!b)return;
+  tlResizeId=blockId;
+  tlResizeStartY=e.touches[0].clientY;
+  tlResizeStartEnd=t2m(b.end);
+  document.addEventListener('touchmove',tlResizeTouchMove,{passive:false});
+  document.addEventListener('touchend',tlResizeTouchUp,{once:true});
+}
+function tlResizeTouchMove(e){
+  e.preventDefault();
+  if(!tlResizeId)return;
+  const dy=e.touches[0].clientY-tlResizeStartY;
+  const dMin=Math.round(dy/TL_H*60/15)*15;
+  const day=getDay();
+  const b=day.blocks.find(x=>x.id===tlResizeId);
+  if(!b)return;
+  const sMin=t2m(b.start);
+  const newEnd=Math.max(sMin+15,Math.min(tlResizeStartEnd+dMin,23*60+45));
+  b.end=m2t(newEnd);
+  renderTimeline();renderTLStats();
+}
+function tlResizeTouchUp(){
+  document.removeEventListener('touchmove',tlResizeTouchMove);
+  tlResizeId=null;
+  scheduleSave();
+}
 let editBlockId=null,blColor=COLORS[0];
 
 // ── 카테고리 템플릿 ──
@@ -1917,7 +1989,10 @@ function renderTimeline(){
       </div>`;
     }
     const memoEsc=(b.memo||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);">
+    return`<div class="tl-block" style="top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);"
+        draggable="true"
+        ondragstart="tlMoveStart(event,'${b.id}');document.body.classList.add('tl-dragging');"
+        ondragend="tlMoveEnd();document.body.classList.remove('tl-dragging');">
       <div class="tl-block-inner" style="background:${c}18;border:1.5px solid ${c}66;border-radius:8px;" onclick="openBlockSheet('${b.id}')">
         <div class="bp-check${b.done?' done':''}" style="${b.done?`background:${c};border-color:${c}`:`border-color:${c}`}"
           onclick="event.stopPropagation();toggleBlock('${b.id}')">✓</div>
@@ -1931,6 +2006,7 @@ function renderTimeline(){
         onclick="event.stopPropagation()"
         onchange="saveBlockMemo(this)"
         oninput="autoResizeMemo(this)">${memoEsc}</textarea>
+      <div class="tl-block-resize" onmousedown="tlResizeStart(event,'${b.id}')" ontouchstart="tlResizeTouchStart(event,'${b.id}')"></div>
     </div>`;
   }).join('');
 
@@ -2137,14 +2213,27 @@ function toggleTL(){
 
 
 // 타임라인 드롭
-function tlOver(e){if(!tlDragText&&!tlRoutineId&&!tlBlockDragId)return;e.preventDefault();e.currentTarget.classList.add('tl-over');}
+function tlOver(e){if(!tlDragText&&!tlRoutineId&&!tlBlockDragId&&!tlMoveId)return;e.preventDefault();e.currentTarget.classList.add('tl-over');}
 function tlLeave(e){e.currentTarget.classList.remove('tl-over');}
 function tlDrop(e,startMin){
   e.preventDefault();
   document.querySelectorAll('.tl-drop-zone').forEach(z=>z.classList.remove('tl-over'));
-  document.body.classList.remove('tl-dragging'); // 항상 제거
+  document.body.classList.remove('tl-dragging');
   const sMin=startMin<48?startMin*60:startMin;
-  // ① 루틴 드롭 → 루틴에 시간 저장
+  // ① 일반 블록 이동
+  if(tlMoveId){
+    const day=getDay();
+    const b=day.blocks.find(x=>x.id===tlMoveId);
+    if(b){
+      const dur=t2m(b.end)-t2m(b.start);
+      b.start=m2t(sMin);
+      b.end=m2t(Math.min(sMin+dur,23*60+59));
+    }
+    tlMoveId=null;
+    renderTimeline();renderTLStats();scheduleSave();
+    return;
+  }
+  // ② 루틴 드롭 → 루틴에 시간 저장
   if(tlRoutineId){
     const r=routines.find(x=>x.id===tlRoutineId);
     if(r){
@@ -2153,13 +2242,12 @@ function tlDrop(e,startMin){
     }
     tlRoutineId=null;
     renderDay();renderRoutines();scheduleSave();
-    // 타임라인 열기
     const body=document.getElementById('tl-body'),arr=document.getElementById('tl-arrow');
     if(!body.classList.contains('open')){body.classList.add('open');arr.classList.add('open');}
     setTimeout(()=>{document.getElementById('tl-body').scrollTop=Math.max(0,(sMin-TL_START*60)/60*TL_H-100);},100);
     return;
   }
-  // ② 루틴 블록 시간 이동
+  // ③ 루틴 블록 시간 이동
   if(tlBlockDragId){
     const r=routines.find(x=>x.id===tlBlockDragId);
     if(r&&r.start&&r.end){
@@ -2171,7 +2259,7 @@ function tlDrop(e,startMin){
     renderDay();renderRoutines();scheduleSave();
     return;
   }
-  // ③ 일반 텍스트 드롭
+  // ④ 일반 텍스트 드롭
   if(!tlDragText)return;
   createBlock(tlDragText,tlDragColor,sMin);
   tlDragText=null;tlDragColor=null;
@@ -2666,6 +2754,15 @@ async function init(){
   await requestNotificationPerm();
   scheduleAlarms();
   showTodaySummary();
+  // tl-dragging 고착 방지 — 드래그가 어떤 이유로든 끝나면 항상 제거
+  document.addEventListener('dragend', ()=>{
+    document.body.classList.remove('tl-dragging');
+    tlDragText=null;tlDragColor=null;tlRoutineId=null;tlBlockDragId=null;
+  });
+  document.addEventListener('touchend', ()=>{
+    // 짧은 딜레이 후 tl-dragging 제거 (터치 드롭 처리 후)
+    setTimeout(()=>document.body.classList.remove('tl-dragging'), 300);
+  });
 }
 init();
 </script>
